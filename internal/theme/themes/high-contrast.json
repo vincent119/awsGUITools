@@ -1,0 +1,10 @@
+{
+  "name": "high-contrast",
+  "primitive_background": "#000000",
+  "contrast_background": "#1a1a1a",
+  "text": "#ffffff",
+  "secondary_text": "#ffff00",
+  "border": "#ff8800",
+  "selection": "#00ffff"
+}
+

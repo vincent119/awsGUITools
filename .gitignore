@@ -1,0 +1,32 @@
+# Build artifacts / binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go tooling
+/bin/
+/dist/
+/build/
+/coverage/
+/profiles/
+
+# Dependency / modules
+/vendor/
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.idea/
+.vscode/
+
+# Environment / secrets
+.env
+.env.*
+
+

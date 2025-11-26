@@ -1,0 +1,148 @@
+---
+description: 專案中處理 Protocol Buffer 定義檔（.proto）的完整規範與最佳實務。
+globs: **/*.proto
+alwaysApply: true
+---
+
+# Protocol buffer
+
+在處理 `.proto` 檔案時，請遵守以下原則與最佳實務。
+
+[總則]
+
+- 目標是產出：清楚、穩定、可向後相容、易維護的 API 介面定義。
+- proto 一旦對外使用，即視為公開契約（contract），修改需極度謹慎。
+- 優先確保向後相容（backward compatible），避免破壞既有 client。
+
+[檔案與套件結構]
+
+- 依照服務與版本分層，例如：
+  - `api/user/v1/user.proto`
+  - `api/order/v1/order.proto`
+- `package` 名稱建議採用：`<domain>.<version>`，例如：`user.v1`、`order.v1`。
+- 每一版 API 使用明確的版本：
+  - 例如 `user.v1` → 未來變更大改時改為 `user.v2`，而不是直接覆寫。
+- 保持同一 proto 內職責清晰：通常一個 service domain 對應一個或少數幾個檔案。
+
+[go_package 設定]
+
+- 必須正確設定 `go_package`，確保 Go 產碼路徑穩定、可預期。
+- 建議使用完整 module path，例如：
+  - `option go_package = "github.com/yourorg/yourrepo/api/user/v1;userv1";`
+- `;` 後面的別名（如 `userv1`）應與 Go import alias 一致且具語意。
+
+[命名規範：Messages]
+
+- message 名稱使用 `PascalCase`，且語意明確：
+  - 資源型：`User`, `Order`, `Invoice`
+  - 請求：`GetUserRequest`, `ListUsersRequest`, `CreateUserRequest`
+  - 回應：`GetUserResponse`, `ListUsersResponse` 或直接回傳資源（視風格與一致性）
+- 分頁查詢常用 pattern：
+  - Request：
+    - `string page_token = 1;`
+    - `int32 page_size = 2;`
+  - Response：
+    - `repeated User users = 1;`
+    - `string next_page_token = 2;`
+- 避免在一個 message 裡放過多不相關欄位，維持結構聚焦。
+
+[命名規範：欄位與服務 / RPC]
+
+- 欄位名稱使用 `snake_case`，且具語意：
+  - `user_id`, `created_at`, `status`, `page_size`
+- service 名稱使用 `PascalCase + Service`，例如：`UserService`, `OrderService`。
+- RPC 方法命名建議遵循資源導向風格：
+  - `GetUser`, `ListUsers`, `CreateUser`, `UpdateUser`, `DeleteUser`
+- 支援搜尋/篩選時，建議使用：
+  - `ListUsers` 搭配 filter 字串或獨立 filter message。
+
+[enum 使用規範]
+
+- enum 名稱使用 `PascalCase`，成員名稱使用全大寫 + 前綴，例如：
+  - `enum UserStatus { USER_STATUS_UNSPECIFIED = 0; USER_STATUS_ACTIVE = 1; USER_STATUS_DISABLED = 2; }`
+- 第一個值必須是 `*_UNSPECIFIED = 0`，避免預設值語意不明。
+- 不可隨意變更既有 enum 數值，若需廢棄：
+  - 使用 `reserved` 標示已不再使用的數值與名稱。
+
+[欄位編號與相容性]
+
+- 欄位編號一旦釋出使用後：
+  - 不可更改含意
+  - 不可重用（即便欄位刪除）
+- 若欄位被移除，請使用：
+  - `reserved <numbers>;` 或 `reserved "<field_name>";`
+- 常用欄位建議使用 1–15（wire format 較省），較不重要放 16 之後。
+- 新增欄位時：
+  - 使用全新編號
+  - 避免改舊欄位型別或語意
+
+[資料型別與常見欄位]
+
+- 避免使用過於寬鬆的型別（如 `bytes`、`string`）取代具體型別。
+- 時間與日期建議使用：
+  - `google.protobuf.Timestamp`（例如 `created_at`, `updated_at`）
+- 金額與數值：
+  - 若需高精度，可考慮字串或專用 message（例如 `Money` message）
+- 可選欄位：
+  - 可使用 `google.protobuf.*Value` wrappers（如 `StringValue`、`Int64Value`）表示 nullable 欄位。
+- 避免三態 bool（有時用 enum 更清楚）。
+
+[service 設計與 gRPC 風格]
+
+- 一個 service 對應一個清楚的 bounded context/domain。
+- 方法設計時應考慮：
+  - idempotency（例如 `Create` vs `Upsert`）
+  - 安全性（需要認證 / 授權的欄位）
+  - 未來擴充空間（request/response 留有可延伸的結構）
+- streaming 使用時機：
+  - server streaming：適合大量結果逐步下發
+  - client streaming / bidi streaming：僅在明確需要時使用，避免過度設計
+
+[工具鏈（buf）]
+
+- 建議使用 buf：在 CI 中執行 `buf lint` 與 `buf breaking` 以防止破壞性變更。
+- 在 `buf.gen.yaml` 統一管理各語言產碼（Go/TS/Java 等）與外掛版本，確保可重現。
+
+[JSON 與相容性]
+
+- 明確定義 JSON 映射與前後端相容策略；新增欄位以向後相容方式推出（不可更動既有欄位語意與型別）。
+- 需要 nullable 時優先 wrappers 或 `proto3 optional`；避免語意不清的三態 bool。
+
+[多語言產碼一致性]
+
+- `go_package`、`java_package`、`csharp_namespace` 等跨語言選項需一致；避免不同語言產碼命名漂移。
+- 固定 protoc 與外掛版本；以鎖定檔或 Makefile 記錄，避免產出差異。
+
+[註解與文件]
+
+- 使用 `//` 風格註解撰寫清楚的說明，對 message、field、service、rpc 進行描述。
+- 註解內容以「使用者如何使用」為主，而非僅重複名稱。
+- 若是跨服務共享的 message（例如 `Paginator`, `Error`），需特別清楚說明欄位語意與約定。
+
+[錯誤模型（可選，但建議）]
+
+- 若專案採用統一錯誤格式，建議設計 shared error message 或使用 Google style：
+  - `google.rpc.Status` + `google.rpc.ErrorInfo` 等
+- 錯誤欄位需包含：
+  - machine readable code（string/enum）
+  - human readable message
+  - optional metadata（例如 invalid field list）
+
+[版本控管與演進]
+
+- 大版本變更（breaking changes）使用新 package：
+  - 例如 `user.v1` → `user.v2`
+- 小變更（非破壞性）：
+  - 優先透過新增欄位、保留舊欄位來演進。
+- 嚴禁：
+  - 改變既有欄位型別
+  - 改變欄位意義
+  - 更動既有欄位的編號
+
+[生成與整合]
+
+- 確保 proto 可以正確透過既定指令產生程式碼（例如 Go / TS / Java）。
+- 對 Go 而言：
+  - 統一使用相同 protoc 版本與外掛（`protoc-gen-go`, `protoc-gen-go-grpc`...）
+  - 產生的 Go 程式碼統一輸出至 `internal/gen/...`，禁止手動修改生成檔
+  - 若有額外插件（如驗證器），需在 proto comment 或專案文件中說明

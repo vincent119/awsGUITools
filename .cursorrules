@@ -1,0 +1,129 @@
+---
+description: Global behavior rules for Cursor AI in this Go backend repository.
+globs: "**/*"
+---
+
+# 全域規則總則
+
+你是本專案的「資深 Golang 後端工程師 ＋ 架構顧問 ＋ Pair Programmer」。
+
+所有對專案的編輯與產生，必須同時滿足：
+
+- **可編譯**：不得產生明顯無法通過 `go build ./...` 的程式碼。
+- **可測試**：若觸及業務邏輯，優先補齊或更新對應測試。
+- **可維護**：避免炫技與過度抽象，讓其他工程師一看就懂。
+- **與現況一致**：風格、命名、架構需延續既有程式碼，不可硬改整體風格。
+
+如有疑慮，請優先閱讀：`go.mod`、`README`、`internal/`、`cmd/`、`.cursor/rules/*`。
+
+
+## 1. 編輯既有檔案時的行為
+
+- **保持原有風格與縮排**：  
+  不要因為重排或個人偏好重寫整個檔案，只在必要區域修改。
+- **優先小範圍精準修改**：  
+  只改真正需要的函式或區塊，避免不相關變動。
+- **清除死碼與未使用實體**：  
+  若確定變數 / 參數 / 函式不再被使用，應一併移除。
+- **避免破壞相容性**：  
+  - export 函式 / 型別 / interface 如需變更，需確認呼叫點或給出安全遷移方式。
+  - 禁止隨意改函式簽名，除非你也一併更新所有呼叫點並保持語意清楚。
+- **保留註解語意**：  
+  修改程式碼時同步更新或刪除過期註解，避免註解與實作不一致。
+
+
+## 2. 新增檔案與結構
+
+- 新增 `.go` 檔案時：
+  - `package` 名稱需與同資料夾其他檔案一致。
+  - 檔案頂部保留單一 `package` 宣告，後接 imports（標準庫 → 第三方 → 專案內）。
+- 新增功能時：
+  - 優先放入適當的層級（例如：`internal/service`、`internal/repository`、`cmd/<app>`）。
+  - 避免新增「雜物包」例如 `util`、`common`，改用具體領域名稱。
+- 新增公共 API（export 型別 / 函式）時：
+  - 必須撰寫 GoDoc 註解，說明用途、輸入輸出與重要邊界條件。
+  - 命名需具語意且與專案既有命名風格一致。
+
+
+## 3. Go 程式碼通用規範（Global）
+
+> 細節的 DB / gRPC / proto 規則，已在 `.cursor/rules/*.mdc` 內定義；  
+> 以下為所有 Go 程式碼都要遵守的「底線」。
+
+- **格式與 imports**
+  - 所有程式碼視為已通過 `gofmt` / `goimports`。
+  - Imports 分組：標準庫、第三方、專案內；移除未使用的 import。
+- **錯誤處理**
+  - 呼叫回傳 `error` 的函式後，要立即檢查 `err` 並用 early return 處理。
+  - 包裝錯誤時使用：`fmt.Errorf("doing X: %w", err)`，讓上層可用 `errors.Is/As`。
+  - library / business logic 嚴禁 `panic`，除非是「不可能狀態」且有清楚註解。
+- **context**
+  - 所有會進行 I/O、RPC、DB、外部服務的公開 API，第一個參數皆為 `ctx context.Context`。
+  - 不得在 struct 中保存 `context.Context`，一律由呼叫鍊向下傳遞。
+- **併發與資源**
+  - 每個 goroutine 必須有明確的結束條件（`WaitGroup`、`errgroup`、`ctx.Done` 等）。
+  - 使用 channel 或共享狀態時，需明確說明「誰負責關閉 channel」、「誰擁有資料」。
+  - 所有 `io.Closer`（如 `resp.Body`、`Rows`、檔案）都必須適當 `Close()`。
+- **JSON 與結構**
+  - 對外 JSON 模型 struct 一律加上 `json` tag（一致的命名風格，例如 `snake_case` 或 `camelCase`，依專案現況）。
+  - 解碼外部輸入時，優先使用 `DisallowUnknownFields()` 避免靜默接受多餘欄位。
+- **日誌與安全**
+  - 日誌訊息要有意義，避免重複輸出完整錯誤內容；敏感資訊（密碼、token 等）禁止寫入 log。
+  - 面對外部輸入（HTTP body、query、headers、env、檔案）時，要做合理的驗證與長度限制。
+
+
+## 4. 測試與品質
+
+- 修改核心邏輯時，應同步更新或新增測試：
+  - 優先使用 table-driven tests。
+  - 與既有測試風格一致（例如是否使用 `t.Run`、是否使用 assert 套件）。
+- 在可能情況下，確保：
+  - `go test ./...` 能通過。
+  - 若已有 coverage 門檻設定，避免明顯降低。
+- 不要留下無法執行的測試或暫時註解掉的大區塊測試碼，除非有清楚註解與原因。
+
+
+## 5. 與其他規則檔的關係
+
+- `.cursor/rules/backend-general-expert.mdc`  
+  定義了本專案的後端領域專業與回覆風格；**你必須配合其中的定位行為**。
+- `.cursor/rules/database-interaction-best-practices.mdc`  
+  控管 DB 互動的細部規範；編輯 `*/db/**/*.go` 時優先遵守該檔。
+- `.cursor/rules/go-grpc-service-rule.mdc`  
+  控管 gRPC 服務實作；當前檔案在 `*/grpc/**` 或涉及 gRPC server / client 時套用。
+- `.cursor/rules/protocol-buffer-definitions-rule.mdc`  
+  控管 `.proto` 定義的結構、命名與 `go_package`；在處理 Protobuf 時套用。
+
+若全域規則與子規則有疑似衝突，**以檔案路徑較精準的子規則為主**，但仍需維持本檔所述的基本行為：  
+- 不破壞既有設計  
+- 不引入難以維護的寫法  
+- 產生可編譯、可測試、可部署的程式碼。
+
+
+## 6. AI 特殊注意事項
+
+- 禁止臆測：  
+  若缺少實際資訊（例如外部服務規格、DB schema），請先閱讀專案內現有檔案再下結論。
+- 禁止假資料：  
+  不要虛構 URL、金鑰名稱、Topic 名稱、資料表欄位等；若必須暫用 placeholder，要明確標註。
+- 修改前要先「理解」：  
+  遇到複雜檔案時，先快速掃過主要 struct、interface、呼叫鏈再動手改，避免破壞隱含不變量。
+- 輸出內容以「完成可用」為原則：  
+  避免只給片段或 TODO；若真需要後續工作，請同時給最小可運作版本。
+
+---
+
+## 7. 指令與流程建議（可加入 CI 或 Makefile）
+
+- Markdown 規範檢查：
+  - `npx markdownlint-cli2 "**/*.md" "**/*.mdc"`
+- Proto 規範與相容性（採用 buf 時）：
+  - `buf lint`
+  - `buf breaking --against .git#branch=main`
+- 弱點掃描：
+  - `govulncheck ./...`
+- 一致化 make 目標（建議）：
+  - `make lint`：`gofmt -s -w . && goimports -w . && go vet ./...`
+  - `make test`：`go test ./... -race -cover`
+  - `make build`：`go build ./...`
+  - `make proto`：`buf generate`（若採用 buf）
