@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,10 +23,13 @@ import (
 type Kind string
 
 const (
-	KindEC2    Kind = "ec2"
-	KindRDS    Kind = "rds"
-	KindS3     Kind = "s3"
-	KindLambda Kind = "lambda"
+	KindEC2            Kind = "ec2"
+	KindRDS            Kind = "rds"
+	KindS3             Kind = "s3"
+	KindLambda         Kind = "lambda"
+	KindRoute53        Kind = "route53"
+	KindRoute53Records Kind = "route53-records"
+	KindS3Objects      Kind = "s3-objects"
 )
 
 // Service 封裝資源查詢與轉換邏輯，供 UI 直接使用。
@@ -35,15 +39,24 @@ type Service struct {
 	timeout time.Duration
 	state   *state.Store
 
-	ec2Repo     *repo.EC2Repository
-	rdsRepo     *repo.RDSRepository
-	s3Repo      *repo.S3Repository
-	lambdaRepo  *repo.LambdaRepository
-	metricFetch metrics.MetricAPI
-	logFetch    *logs.Fetcher
+	ec2Repo      *repo.EC2Repository
+	rdsRepo      *repo.RDSRepository
+	s3Repo       *repo.S3Repository
+	lambdaRepo   *repo.LambdaRepository
+	route53Repo  *repo.Route53Repository
+	metricFetch  metrics.MetricAPI
+	logFetch     *logs.Fetcher
 
 	mu    sync.RWMutex
 	cache map[Kind]map[string]models.DetailView
+
+	// S3 瀏覽狀態
+	currentBucket string
+	currentPrefix string
+
+	// Route53 瀏覽狀態
+	currentZoneID   string
+	currentZoneName string
 }
 
 // NewService 建立資源服務。
@@ -52,15 +65,16 @@ func NewService(factory *clients.Factory, metrics *observability.AWSCallMetrics,
 		timeout = 15 * time.Second
 	}
 	return &Service{
-		factory:    factory,
-		metrics:    metrics,
-		timeout:    timeout,
-		state:      st,
-		ec2Repo:    repo.NewEC2Repository(),
-		rdsRepo:    repo.NewRDSRepository(),
-		s3Repo:     repo.NewS3Repository(),
-		lambdaRepo: repo.NewLambdaRepository(),
-		cache:      make(map[Kind]map[string]models.DetailView),
+		factory:     factory,
+		metrics:     metrics,
+		timeout:     timeout,
+		state:       st,
+		ec2Repo:     repo.NewEC2Repository(),
+		rdsRepo:     repo.NewRDSRepository(),
+		s3Repo:      repo.NewS3Repository(),
+		lambdaRepo:  repo.NewLambdaRepository(),
+		route53Repo: repo.NewRoute53Repository(),
+		cache:       make(map[Kind]map[string]models.DetailView),
 	}
 }
 
@@ -133,6 +147,48 @@ func (s *Service) ListItems(ctx context.Context, kind Kind, matcher search.Match
 		s.observe(ctx, "lambda", "ListFunctions", start, err)
 		if err == nil {
 			items, details = buildLambdaList(fns, matcher)
+		}
+	case KindRoute53:
+		client, errClient := s.factory.Route53(ctx, profile, region)
+		if errClient != nil {
+			return nil, errClient
+		}
+		var zones []models.Route53HostedZone
+		start := time.Now()
+		zones, err = s.route53Repo.ListHostedZones(ctx, client)
+		s.observe(ctx, "route53", "ListHostedZones", start, err)
+		if err == nil {
+			items, details = buildRoute53ZoneList(zones, matcher)
+		}
+	case KindRoute53Records:
+		if s.currentZoneID == "" {
+			return nil, fmt.Errorf("no hosted zone selected")
+		}
+		client, errClient := s.factory.Route53(ctx, profile, region)
+		if errClient != nil {
+			return nil, errClient
+		}
+		var records []models.Route53Record
+		start := time.Now()
+		records, err = s.route53Repo.ListRecords(ctx, client, s.currentZoneID)
+		s.observe(ctx, "route53", "ListResourceRecordSets", start, err)
+		if err == nil {
+			items, details = buildRoute53RecordList(records, s.currentZoneName, matcher)
+		}
+	case KindS3Objects:
+		if s.currentBucket == "" {
+			return nil, fmt.Errorf("no bucket selected")
+		}
+		client, errClient := s.factory.S3(ctx, profile, region)
+		if errClient != nil {
+			return nil, errClient
+		}
+		var objects []models.S3Object
+		start := time.Now()
+		objects, err = s.s3Repo.ListObjects(ctx, client, s.currentBucket, s.currentPrefix)
+		s.observe(ctx, "s3", "ListObjectsV2", start, err)
+		if err == nil {
+			items, details = buildS3ObjectList(objects, s.currentBucket, s.currentPrefix, matcher)
 		}
 	default:
 		return nil, fmt.Errorf("unknown resource kind: %s", kind)
@@ -447,4 +503,207 @@ func fallback(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// SetCurrentBucket 設定目前瀏覽的 S3 bucket。
+func (s *Service) SetCurrentBucket(bucket string) {
+	s.currentBucket = bucket
+	s.currentPrefix = ""
+}
+
+// SetCurrentPrefix 設定目前瀏覽的 S3 prefix（目錄）。
+func (s *Service) SetCurrentPrefix(prefix string) {
+	s.currentPrefix = prefix
+}
+
+// CurrentBucket 回傳目前瀏覽的 bucket 名稱。
+func (s *Service) CurrentBucket() string {
+	return s.currentBucket
+}
+
+// CurrentPrefix 回傳目前瀏覽的 prefix。
+func (s *Service) CurrentPrefix() string {
+	return s.currentPrefix
+}
+
+// NavigateUp 返回上一層目錄，回傳是否還在 bucket 內。
+func (s *Service) NavigateUp() bool {
+	if s.currentPrefix == "" {
+		// 已在根目錄，清除 bucket 回到 bucket 列表
+		s.currentBucket = ""
+		return false
+	}
+	// 移除最後一個目錄
+	prefix := strings.TrimSuffix(s.currentPrefix, "/")
+	lastSlash := strings.LastIndex(prefix, "/")
+	if lastSlash < 0 {
+		s.currentPrefix = ""
+	} else {
+		s.currentPrefix = prefix[:lastSlash+1]
+	}
+	return true
+}
+
+// SetCurrentZone 設定目前瀏覽的 Route53 Hosted Zone。
+func (s *Service) SetCurrentZone(zoneID, zoneName string) {
+	s.currentZoneID = zoneID
+	s.currentZoneName = zoneName
+}
+
+// CurrentZoneID 回傳目前瀏覽的 Zone ID。
+func (s *Service) CurrentZoneID() string {
+	return s.currentZoneID
+}
+
+// CurrentZoneName 回傳目前瀏覽的 Zone 名稱。
+func (s *Service) CurrentZoneName() string {
+	return s.currentZoneName
+}
+
+// ClearCurrentZone 清除目前的 Zone，回到 Zone 列表。
+func (s *Service) ClearCurrentZone() {
+	s.currentZoneID = ""
+	s.currentZoneName = ""
+}
+
+func buildRoute53ZoneList(zones []models.Route53HostedZone, matcher search.Matcher) ([]models.ListItem, map[string]models.DetailView) {
+	items := make([]models.ListItem, 0, len(zones))
+	details := make(map[string]models.DetailView, len(zones))
+
+	for _, zone := range zones {
+		if !matcher.Match(zone.Name + zone.ID) {
+			continue
+		}
+		zoneType := "Public"
+		if zone.IsPrivate {
+			zoneType = "Private"
+		}
+		items = append(items, models.ListItem{
+			ID:     zone.ID,
+			Name:   zone.Name,
+			Type:   "Route53",
+			Status: zoneType,
+			Metadata: map[string]string{
+				"records": fmt.Sprintf("%d", zone.RecordCount),
+			},
+		})
+		details[zone.ID] = models.DetailView{
+			Overview: map[string]string{
+				"Zone ID":      zone.ID,
+				"Name":         zone.Name,
+				"Type":         zoneType,
+				"Record Count": fmt.Sprintf("%d", zone.RecordCount),
+				"Comment":      zone.Comment,
+			},
+		}
+	}
+	return items, details
+}
+
+func buildRoute53RecordList(records []models.Route53Record, zoneName string, matcher search.Matcher) ([]models.ListItem, map[string]models.DetailView) {
+	items := make([]models.ListItem, 0, len(records))
+	details := make(map[string]models.DetailView, len(records))
+
+	for _, record := range records {
+		if !matcher.Match(record.Name + record.Type) {
+			continue
+		}
+		id := record.Name + "_" + record.Type
+		value := ""
+		if record.AliasTarget != "" {
+			value = "ALIAS → " + record.AliasTarget
+		} else if len(record.Values) > 0 {
+			value = record.Values[0]
+			if len(record.Values) > 1 {
+				value += fmt.Sprintf(" (+%d)", len(record.Values)-1)
+			}
+		}
+		items = append(items, models.ListItem{
+			ID:     id,
+			Name:   record.Name,
+			Type:   record.Type,
+			Status: value,
+			Metadata: map[string]string{
+				"ttl": fmt.Sprintf("%d", record.TTL),
+			},
+		})
+		details[id] = models.DetailView{
+			Overview: map[string]string{
+				"Name":   record.Name,
+				"Type":   record.Type,
+				"TTL":    fmt.Sprintf("%d", record.TTL),
+				"Zone":   zoneName,
+			},
+			Relations: map[string][]string{
+				"Values": record.Values,
+			},
+		}
+		if record.AliasTarget != "" {
+			details[id].Overview["Alias"] = record.AliasTarget
+		}
+	}
+	return items, details
+}
+
+func buildS3ObjectList(objects []models.S3Object, bucket, prefix string, matcher search.Matcher) ([]models.ListItem, map[string]models.DetailView) {
+	items := make([]models.ListItem, 0, len(objects))
+	details := make(map[string]models.DetailView, len(objects))
+
+	for _, obj := range objects {
+		// 取得顯示名稱（移除 prefix）
+		displayName := strings.TrimPrefix(obj.Key, prefix)
+		if obj.IsDirectory {
+			displayName = strings.TrimSuffix(displayName, "/") + "/"
+		}
+
+		if !matcher.Match(displayName) {
+			continue
+		}
+
+		objType := "File"
+		status := formatSize(obj.Size)
+		if obj.IsDirectory {
+			objType = "Dir"
+			status = ""
+		}
+
+		items = append(items, models.ListItem{
+			ID:     obj.Key,
+			Name:   displayName,
+			Type:   objType,
+			Status: status,
+			Region: obj.LastModified,
+			Metadata: map[string]string{
+				"storage": obj.StorageClass,
+				"bucket":  bucket,
+			},
+		})
+
+		details[obj.Key] = models.DetailView{
+			Overview: map[string]string{
+				"Key":           obj.Key,
+				"Bucket":        bucket,
+				"Size":          formatSize(obj.Size),
+				"Last Modified": obj.LastModified,
+				"Storage Class": obj.StorageClass,
+			},
+		}
+	}
+	return items, details
+}
+
+func formatSize(bytes int64) string {
+	if bytes == 0 {
+		return "0 B"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

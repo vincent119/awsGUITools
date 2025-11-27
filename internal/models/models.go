@@ -52,6 +52,33 @@ type S3Bucket struct {
 	Tags       TagMap
 }
 
+// S3Object describes an object or prefix (directory) in a bucket.
+type S3Object struct {
+	Key          string
+	Size         int64
+	LastModified string
+	StorageClass string
+	IsDirectory  bool // true if this is a common prefix (folder)
+}
+
+// Route53HostedZone describes a Route53 hosted zone.
+type Route53HostedZone struct {
+	ID          string
+	Name        string
+	RecordCount int64
+	IsPrivate   bool
+	Comment     string
+}
+
+// Route53Record describes a DNS record in a hosted zone.
+type Route53Record struct {
+	Name        string
+	Type        string
+	TTL         int64
+	Values      []string
+	AliasTarget string // if alias record
+}
+
 // LambdaFunction describes AWS Lambda metadata.
 type LambdaFunction struct {
 	Name         string

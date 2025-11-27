@@ -6,6 +6,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
+	"github.com/vin/ck123gogo/internal/i18n"
 	"github.com/vin/ck123gogo/internal/models"
 )
 
@@ -21,7 +22,7 @@ func NewView() *View {
 	table := tview.NewTable().
 		SetSelectable(true, false).
 		SetFixed(1, 0)
-	table.SetBorder(true).SetTitle("資源清單")
+	table.SetBorder(true).SetTitle(i18n.T("ui.resource_list"))
 
 	v := &View{table: table}
 	table.SetSelectedFunc(func(row, _ int) {
@@ -60,7 +61,12 @@ func (v *View) SetItems(items []models.ListItem) {
 	v.items = items
 	v.table.Clear()
 
-	headers := []string{"名稱", "類型", "狀態", "區域/資訊"}
+	headers := []string{
+		i18n.T("column.name"),
+		i18n.T("column.type"),
+		i18n.T("column.status"),
+		i18n.T("column.region"),
+	}
 	for col, header := range headers {
 		v.table.SetCell(0, col, headerCell(header))
 	}
@@ -101,6 +107,21 @@ func (v *View) CurrentItem() (models.ListItem, bool) {
 // Count 回傳列表項目數。
 func (v *View) Count() int {
 	return len(v.items)
+}
+
+// RefreshLabels 刷新標題與欄位名稱（語言切換時使用）。
+func (v *View) RefreshLabels() {
+	v.table.SetTitle(i18n.T("ui.resource_list"))
+	// 更新欄位標題
+	headers := []string{
+		i18n.T("column.name"),
+		i18n.T("column.type"),
+		i18n.T("column.status"),
+		i18n.T("column.region"),
+	}
+	for col, header := range headers {
+		v.table.SetCell(0, col, headerCell(header))
+	}
 }
 
 func headerCell(text string) *tview.TableCell {

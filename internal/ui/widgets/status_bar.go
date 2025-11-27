@@ -5,6 +5,7 @@ import (
 
 	"github.com/rivo/tview"
 
+	"github.com/vin/ck123gogo/internal/i18n"
 	"github.com/vin/ck123gogo/internal/service/resource"
 )
 
@@ -29,14 +30,25 @@ func (s *StatusBar) Primitive() *tview.TextView {
 
 // SetStatus 更新顯示。
 func (s *StatusBar) SetStatus(profile, region, theme string, kind resource.Kind, count int, message string) {
-	text := fmt.Sprintf("[yellow]Profile:[-] %s  [yellow]Region:[-] %s  [yellow]Theme:[-] %s  [yellow]Kind:[-] %s  [yellow]Count:[-] %d  %s",
+	// 快捷鍵提示（使用 <key:label> 格式避免被當成顏色標籤）
+	shortcuts := fmt.Sprintf("[darkcyan]<?:%s> <q:%s>[-]",
+		i18n.T("shortcut.help"),
+		i18n.T("shortcut.quit"),
+	)
+	// 狀態資訊
+	status := fmt.Sprintf("[yellow]P:[-]%s [yellow]R:[-]%s [yellow]T:[-]%s [yellow]K:[-]%s [yellow]#:[-]%d",
 		emptyFallback(profile, "default"),
 		emptyFallback(region, "us-east-1"),
 		emptyFallback(theme, "dark"),
 		kind,
 		count,
-		message,
 	)
+	// 組合
+	text := shortcuts + " " + status
+	// 訊息（放最後，超長時會被截斷）
+	if message != "" {
+		text += "  " + message
+	}
 	s.view.SetText(text)
 }
 

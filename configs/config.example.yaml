@@ -1,6 +1,12 @@
-# AWS TUI 設定範例
-profile: default
-region: us-east-1
-theme: dark
-page_size: 50
-request_timeout: 5s
+# AWS TUI Configuration Example
+#
+# Note: profile and region are now read from ~/.aws/config.
+# The profile setting here specifies which profile to use by default.
+# Region is only used as fallback if the profile has no region set.
+#
+# profile: default        # AWS profile to use (from ~/.aws/config)
+# region: us-east-1       # Fallback region (if profile has no region)
+theme: dark # UI theme: dark, light, high-contrast
+language: en # UI language: en (English), zh-TW (繁體中文)
+page_size: 50 # Page size for resource lists
+request_timeout: 5s # AWS API request timeout

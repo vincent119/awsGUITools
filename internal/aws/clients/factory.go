@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/vin/ck123gogo/internal/aws/session"
@@ -84,4 +85,14 @@ func (f *Factory) CloudWatchLogs(ctx context.Context, profile, region string) (*
 		return nil, err
 	}
 	return cloudwatchlogs.NewFromConfig(cfg), nil
+}
+
+// Route53 回傳 route53.Client（Route53 是 global 服務，region 固定為 us-east-1）。
+func (f *Factory) Route53(ctx context.Context, profile, _ string) (*route53.Client, error) {
+	// Route53 API 需使用 us-east-1
+	cfg, err := f.load(ctx, profile, "us-east-1")
+	if err != nil {
+		return nil, err
+	}
+	return route53.NewFromConfig(cfg), nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/vin/ck123gogo/internal/app/state"
 	awsclients "github.com/vin/ck123gogo/internal/aws/clients"
 	"github.com/vin/ck123gogo/internal/aws/session"
+	"github.com/vin/ck123gogo/internal/i18n"
 	"github.com/vin/ck123gogo/internal/observability"
 	"github.com/vin/ck123gogo/internal/service/resource"
 	"github.com/vin/ck123gogo/internal/theme"
@@ -75,7 +76,11 @@ func New(opts ...Option) (*App, error) {
 	}
 	a.cfg = cfg
 
-	a.stateStore = state.New(cfg.Profile, cfg.Region, cfg.Theme)
+	// 初始化 i18n（根據設定的語言）
+	i18n.SetLanguage(i18n.Language(cfg.Language))
+
+	// 使用 NewWithProfiles 以支援 profile 選擇與自動 region 切換
+	a.stateStore = state.NewWithProfiles(cfg.Profile, cfg.Region, cfg.Theme, cfg.Language, cfg.Profiles)
 
 	themeMgr, err := theme.NewManager()
 	if err != nil {
@@ -83,6 +88,12 @@ func New(opts ...Option) (*App, error) {
 	}
 	a.themeMgr = themeMgr
 
+	// 先初始化 AWS 相關元件（順序重要！）
+	a.sessionLoader = session.NewLoader()
+	a.clientFactory = awsclients.NewFactory(a.sessionLoader)
+	a.metrics = observability.NewAWSCallMetrics(a.logger)
+
+	// 現在才能建立 resource service（依賴 clientFactory）
 	a.resources = resource.NewService(a.clientFactory, a.metrics, cfg.RequestTimeout, a.stateStore)
 
 	uiRoot, err := ui.NewRoot(cfg, themeMgr, a.stateStore, a.resources)
@@ -90,10 +101,6 @@ func New(opts ...Option) (*App, error) {
 		return nil, fmt.Errorf("init ui root: %w", err)
 	}
 	a.uiRoot = uiRoot
-
-	a.sessionLoader = session.NewLoader()
-	a.clientFactory = awsclients.NewFactory(a.sessionLoader)
-	a.metrics = observability.NewAWSCallMetrics(a.logger)
 
 	return a, nil
 }

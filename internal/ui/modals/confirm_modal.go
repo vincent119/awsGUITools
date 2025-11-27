@@ -6,6 +6,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+
+	"github.com/vin/ck123gogo/internal/i18n"
 )
 
 // ConfirmModal 顯示操作確認對話框。
@@ -17,7 +19,7 @@ type ConfirmModal struct {
 // NewConfirmModal 建立確認對話框。
 func NewConfirmModal() *ConfirmModal {
 	modal := tview.NewModal().
-		AddButtons([]string{"確認", "取消"})
+		AddButtons([]string{i18n.T("action.confirm"), i18n.T("action.cancel")})
 	m := &ConfirmModal{modal: modal}
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if m.onResult != nil {
@@ -47,7 +49,7 @@ type ResultModal struct {
 // NewResultModal 建立結果對話框。
 func NewResultModal() *ResultModal {
 	modal := tview.NewModal().
-		AddButtons([]string{"確定"})
+		AddButtons([]string{i18n.T("action.ok")})
 	m := &ResultModal{modal: modal}
 	modal.SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 		if m.onOK != nil {
@@ -64,19 +66,19 @@ func (m *ResultModal) Primitive() *tview.Modal {
 
 // ShowSuccess 顯示成功訊息。
 func (m *ResultModal) ShowSuccess(message string, onOK func()) {
-	m.modal.SetText(fmt.Sprintf("[green]✓ 成功[-]\n\n%s", message))
+	m.modal.SetText(fmt.Sprintf("[green]✓ %s[-]\n\n%s", i18n.T("status.success"), message))
 	m.onOK = onOK
 }
 
 // ShowError 顯示錯誤訊息。
 func (m *ResultModal) ShowError(err error, onOK func()) {
-	m.modal.SetText(fmt.Sprintf("[red]✗ 錯誤[-]\n\n%s", err.Error()))
+	m.modal.SetText(fmt.Sprintf("[red]✗ %s[-]\n\n%s", i18n.T("status.error"), err.Error()))
 	m.onOK = onOK
 }
 
 // ShowInfo 顯示資訊訊息。
 func (m *ResultModal) ShowInfo(message string, onOK func()) {
-	m.modal.SetText(fmt.Sprintf("[yellow]ℹ 資訊[-]\n\n%s", message))
+	m.modal.SetText(fmt.Sprintf("[yellow]ℹ %s[-]\n\n%s", i18n.T("status.info"), message))
 	m.onOK = onOK
 }
 
@@ -90,7 +92,7 @@ type ActionPanel struct {
 func NewActionPanel() *ActionPanel {
 	list := tview.NewList().
 		ShowSecondaryText(false)
-	list.SetBorder(true).SetTitle("操作")
+	list.SetBorder(true).SetTitle(i18n.T("ui.actions"))
 	p := &ActionPanel{list: list}
 	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEscape {
@@ -122,22 +124,22 @@ func (p *ActionPanel) SetActions(actions []string, onAction func(action string))
 			}
 		})
 	}
-	p.list.AddItem("取消", "", 'q', func() {
+	p.list.AddItem(i18n.T("action.cancel"), "", 'q', func() {
 		if p.onAction != nil {
 			p.onAction("")
 		}
 	})
 }
 
-// AvailableActions 根據資源類型回傳可用操作。
+// AvailableActions 根據資源類型回傳可用操作（已 i18n）。
 func AvailableActions(resourceType string) []string {
 	switch resourceType {
 	case "EC2":
-		return []string{"啟動", "停止", "重新啟動"}
+		return []string{i18n.T("action.start"), i18n.T("action.stop"), i18n.T("action.reboot")}
 	case "RDS":
-		return []string{"啟動", "停止", "重新啟動"}
+		return []string{i18n.T("action.start"), i18n.T("action.stop"), i18n.T("action.reboot")}
 	case "Lambda":
-		return []string{"測試呼叫"}
+		return []string{i18n.T("action.invoke")}
 	case "S3":
 		return []string{} // S3 目前無操作
 	default:

@@ -6,6 +6,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
+	"github.com/vin/ck123gogo/internal/i18n"
 	"github.com/vin/ck123gogo/internal/models"
 	"github.com/vin/ck123gogo/internal/ui/modals"
 )
@@ -22,7 +23,7 @@ func NewView() *View {
 	text := tview.NewTextView().
 		SetDynamicColors(true).
 		SetWrap(true)
-	text.SetBorder(true).SetTitle("資源詳情 [a:操作]")
+	text.SetBorder(true).SetTitle(i18n.T("ui.resource_detail"))
 	v := &View{text: text}
 	text.SetInputCapture(v.handleInput)
 	return v
@@ -59,7 +60,7 @@ func (v *View) handleInput(event *tcell.EventKey) *tcell.EventKey {
 // SetDetail 顯示詳細資訊。
 func (v *View) SetDetail(detail models.DetailView) {
 	if len(detail.Overview) == 0 {
-		v.text.SetText("尚未選取資源")
+		v.text.SetText(i18n.T("ui.no_resource"))
 		return
 	}
 
