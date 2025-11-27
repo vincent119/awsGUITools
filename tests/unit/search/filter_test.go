@@ -1,3 +1,4 @@
+// Package search 提供字串搜尋功能的單元測試。
 package search_test
 
 import (
