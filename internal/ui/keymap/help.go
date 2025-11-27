@@ -1,3 +1,4 @@
+// Package keymap 提供快捷鍵說明功能。
 package keymap
 
 import (

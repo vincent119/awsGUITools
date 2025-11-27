@@ -1,3 +1,4 @@
+// Package aws 提供 AWS 資源操作的整合測試。
 package aws
 
 import (

@@ -1,3 +1,4 @@
+// Package tags 提供 AWS 資源標籤管理功能。
 package tags
 
 import (

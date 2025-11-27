@@ -1,3 +1,4 @@
+// Package search 提供字串搜尋功能。
 package search
 
 import (

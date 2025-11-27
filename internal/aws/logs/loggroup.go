@@ -1,3 +1,4 @@
+// Package logs 提供 CloudWatch Logs 相關功能。
 package logs
 
 import "fmt"

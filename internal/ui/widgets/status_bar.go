@@ -1,3 +1,4 @@
+// Package widgets 提供 UI 元件的輔助功能。
 package widgets
 
 import (

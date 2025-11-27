@@ -1,3 +1,4 @@
+// Package aws 提供 AWS 設定檔解析的單元測試。
 package aws_test
 
 import (

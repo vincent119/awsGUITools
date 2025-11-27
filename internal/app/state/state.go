@@ -1,3 +1,4 @@
+// Package state 提供應用程式的全域狀態管理。
 package state
 
 import (

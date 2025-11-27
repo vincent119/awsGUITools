@@ -1,3 +1,4 @@
+// Package tags 提供標籤驗證功能的單元測試。
 package tags
 
 import (

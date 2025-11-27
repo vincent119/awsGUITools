@@ -1,3 +1,4 @@
+// Package ui 提供主應用程式的 UI 管理。
 package ui
 
 import (

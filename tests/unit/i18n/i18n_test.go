@@ -1,3 +1,4 @@
+// Package i18n 提供國際化功能的單元測試。
 package i18n_test
 
 import (

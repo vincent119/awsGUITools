@@ -1,3 +1,4 @@
+// Package ops 封裝 AWS 資源操作邏輯（start/stop/reboot 等）。
 package ops
 
 import (

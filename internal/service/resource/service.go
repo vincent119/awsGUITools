@@ -1,3 +1,4 @@
+// Package resource 提供資源查詢與轉換服務。
 package resource
 
 import (

@@ -1,3 +1,4 @@
+// Package app 提供應用程式生命週期管理與主要業務邏輯。
 package app
 
 import (

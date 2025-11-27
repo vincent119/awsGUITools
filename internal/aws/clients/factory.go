@@ -1,3 +1,4 @@
+// Package clients 提供 AWS 服務的 client 工廠。
 package clients
 
 import (

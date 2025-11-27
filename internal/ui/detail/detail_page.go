@@ -1,3 +1,4 @@
+// Package detail 提供資源詳細資訊的顯示與操作功能。
 package detail
 
 import (

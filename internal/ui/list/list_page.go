@@ -1,3 +1,4 @@
+// Package list 提供資源清單的顯示與操作功能。
 package list
 
 import (

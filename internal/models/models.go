@@ -1,3 +1,4 @@
+// Package models 提供 AWS 資源的模型定義。
 package models
 
 // TagMap represents AWS resource tags.

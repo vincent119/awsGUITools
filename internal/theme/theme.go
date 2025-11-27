@@ -1,3 +1,5 @@
+// Package theme 提供主題管理功能。
+
 package theme
 
 import (

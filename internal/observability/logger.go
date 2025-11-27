@@ -1,3 +1,4 @@
+// Package observability 提供應用程式的日誌與度量功能。
 package observability
 
 import (

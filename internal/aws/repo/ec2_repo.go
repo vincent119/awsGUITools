@@ -1,3 +1,4 @@
+// Package repo 提供 AWS 資源的查詢與轉換功能。
 package repo
 
 import (
