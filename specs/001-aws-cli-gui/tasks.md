@@ -134,6 +134,107 @@
 
 ---
 
+## Phase 7: 設定優化與 i18n 支援
+
+**Purpose**: 改進設定載入機制，從 AWS CLI 原生設定讀取 profiles，並支援多語言介面
+
+### 需求 7.1: 從 .aws/config 讀取 Profiles（不依賴 config.yaml）
+
+- [x] T701 [P] 建立 `internal/aws/profile/parser.go`：解析 `~/.aws/config` 與 `~/.aws/credentials`，獲取所有 profiles 列表與對應 region
+- [x] T702 更新 `internal/app/config/config.go`：移除 profile/region 硬編碼依賴，改為從 AWS config 動態載入
+- [x] T703 [P] 建立 `tests/unit/aws/profile_parser_test.go`：測試 AWS config 解析邏輯（含多 profile、無 region 等邊界情況）
+- [x] T704 增加跨平台支援（Windows/macOS/Linux）與環境變數覆蓋（AWS_CONFIG_FILE, AWS_SHARED_CREDENTIALS_FILE）
+
+### 需求 7.2: 切換 Profile 時自動切換 Region
+
+- [x] T710 更新 `internal/app/state/state.go`：新增 `ProfileInfo` 結構，包含 profile 名稱與對應 region，並更新相關 getter/setter
+- [x] T711 更新 `internal/ui/root.go`：Profile 切換改為選單式選擇，選擇後自動帶入該 profile 的 region
+- [x] T712 建立 `internal/ui/modals/profile_picker.go`：Profile 選擇 Modal，顯示可用 profiles 與預設 region
+- [x] T713 移除 'r' 快捷鍵（Region 隨 Profile 自動切換）
+- [x] T714 更新 `internal/ui/keymap/help.go`：更新快捷鍵說明
+
+### 需求 7.3: 介面 i18n 支援（預設英文，支援繁體中文）
+
+- [x] T720 建立 `internal/i18n/i18n.go`：定義翻譯介面、載入機制與語言切換 API
+- [x] T721 [P] 建立 `internal/i18n/messages/en.json` 與 `internal/i18n/messages/zh-TW.json`：定義所有 UI 文字翻譯
+- [x] T722 更新 `internal/ui/*.go`：將所有硬編碼中文改為 `i18n.T("key")` 呼叫
+- [x] T723 更新 `internal/ui/keymap/help.go`：i18n 化快捷鍵說明文字
+- [x] T724 更新 `internal/app/config/config.go`：新增 `language` 設定欄位（預設 `en`）
+- [x] T725 [P] 建立 `tests/unit/i18n/i18n_test.go`：測試多語言載入與 fallback 機制
+- [x] T726 新增語言切換快捷鍵（如 `L`），允許 runtime 切換語言
+
+### Phase 7 驗收標準
+
+- 啟動時自動讀取 `~/.aws/config` 中的 profiles，無需在 config.yaml 指定 profile
+- 切換 Profile 時，Region 自動切換至該 profile 設定的 region（若有）
+- 所有 UI 文字可透過語言設定切換為英文或繁體中文
+- 預設語言為英文
+
+---
+
+## Phase 8: S3 物件瀏覽與 Route53 支援
+
+**Purpose**: 擴展 S3 功能以支援瀏覽 Bucket 內物件，並新增 Route53 資源類型
+
+### 需求 8.1: S3 Bucket 物件瀏覽
+
+- [x] T801 建立 `internal/models/s3_object.go`：定義 S3Object 結構（Key, Size, LastModified, StorageClass, IsDirectory）
+- [x] T802 更新 `internal/aws/repo/s3_repo.go`：新增 `ListObjects(ctx, client, bucket, prefix)` 方法，支援 prefix 導航
+- [x] T803 新增資源類型 `KindS3Objects`：用於 S3 物件瀏覽模式
+- [x] T804 S3 物件瀏覽整合至 `internal/service/resource/service.go`（未另建 UI 檔案，直接使用現有清單元件）
+- [x] T805 更新 `internal/service/resource/service.go`：新增 `ListS3Objects` 方法與導航邏輯
+- [x] T806 新增快捷鍵 `Enter` 進入 Bucket 瀏覽物件、`Backspace` 返回上層
+- [x] T807 [P] 建立 `tests/unit/aws/s3_objects_test.go`：測試物件列表與 prefix 解析
+
+### 需求 8.2: Route53 Hosted Zones 與 Records
+
+- [x] T810 建立 Route53 models（整合至 `internal/models/models.go`）
+- [x] T811 建立 `internal/aws/repo/route53_repo.go`：實作 ListHostedZones 與 ListRecords
+- [x] T812 更新 `internal/aws/clients/factory.go`：新增 Route53 client 工廠方法
+- [x] T813 新增資源類型 `KindRoute53` 與 `KindRoute53Records`
+- [x] T814 更新 `internal/service/resource/service.go`：整合 Route53 查詢邏輯
+- [x] T815 更新 `internal/ui/root.go`：新增 `5` 快捷鍵切換至 Route53
+- [x] T816 更新 `internal/ui/keymap/help.go`：新增 Route53 快捷鍵說明
+- [x] T817 [P] 建立 `tests/unit/aws/route53_test.go`：測試 Hosted Zone 與 Record 解析
+
+### 需求 8.3: i18n 更新
+
+- [x] T820 更新 `internal/i18n/messages/*.json`：新增 S3 物件與 Route53 相關翻譯
+
+### Phase 8 驗收標準
+
+- 選擇 S3 bucket 後按 Enter 可進入瀏覽物件，顯示物件名稱/大小/日期
+- 物件瀏覽支援 prefix 目錄導航，可用 Backspace 返回上層
+- 按 `5` 可切換至 Route53，列出所有 Hosted Zones
+- 選擇 Hosted Zone 後按 Enter 可查看 Records 列表
+- Record 詳情顯示 Type、Name、Value、TTL
+
+---
+
+## Phase 9: UI 增強
+
+**Purpose**: 改善使用者體驗，新增快捷鍵提示與 UI 優化
+
+### 需求 9.1: 狀態列快捷鍵提示
+
+- [x] T901 更新 `internal/ui/widgets/status_bar.go`：在狀態列顯示常用快捷鍵提示（?:Help、q:Quit）
+- [x] T902 更新 `internal/i18n/messages/*.json`：新增 `shortcut.help` 與 `shortcut.quit` 翻譯
+- [x] T903 優化狀態列格式：簡化標籤（P:/R:/T:/K:/#:），確保快捷鍵提示永遠顯示
+
+### 需求 9.2: Modal 按鍵處理修復
+
+- [x] T910 修復 `internal/ui/root.go`：Modal（Help/Profile Picker/Action Panel）可正確接收按鍵事件
+- [x] T911 修復搜尋欄 Enter 鍵：在搜尋欄按 Enter 可正確執行搜尋
+
+### Phase 9 驗收標準
+
+- 狀態列顯示 `<?:Help> <q:Quit>` 快捷鍵提示
+- 快捷鍵提示支援 i18n（英文/繁體中文）
+- Help 對話框的「關閉」按鈕可正常點擊
+- 搜尋欄可正常輸入並按 Enter 執行搜尋
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -142,6 +243,9 @@
 - Foundational（Phase 2）：依賴 Setup；完成前不得開始任何 user story
 - User Story 1（Phase 3）：依賴 Phase 2；完成後即達 MVP，可獨立交付
 - User Stories 2~4（Phases 4~6）：皆依賴 Phase 3，彼此可視資源平行，但需避免同檔衝突
+- 設定優化與 i18n（Phase 7）：依賴 Phase 3（MVP）；可與 Phase 4~6 平行進行
+- S3 物件與 Route53（Phase 8）：依賴 Phase 3（MVP）與 Phase 7（i18n）
+- UI 增強（Phase 9）：依賴 Phase 7（i18n）；狀態列快捷鍵提示與 Modal 修復
 - Polish（Phase N）：所有目標故事完成後再進行
 
 ### Parallel Opportunities
