@@ -31,10 +31,10 @@ func TestRoute53Repository_NilClient(t *testing.T) {
 
 func TestParseHostedZone(t *testing.T) {
 	tests := []struct {
-		name     string
-		zone     types.HostedZone
-		wantID   string
-		wantName string
+		name        string
+		zone        types.HostedZone
+		wantID      string
+		wantName    string
 		wantPrivate bool
 	}{
 		{
@@ -108,12 +108,12 @@ func TestParseHostedZone(t *testing.T) {
 
 func TestParseResourceRecord(t *testing.T) {
 	tests := []struct {
-		name           string
-		recordSet      types.ResourceRecordSet
-		wantName       string
-		wantType       string
-		wantTTL        int64
-		wantValues     []string
+		name            string
+		recordSet       types.ResourceRecordSet
+		wantName        string
+		wantType        string
+		wantTTL         int64
+		wantValues      []string
 		wantAliasTarget string
 	}{
 		{
@@ -224,9 +224,9 @@ func TestParseResourceRecord(t *testing.T) {
 					{Value: aws.String("ns-3456.awsdns-78.net.")},
 				},
 			},
-			wantName:   "example.com.",
-			wantType:   "NS",
-			wantTTL:    172800,
+			wantName: "example.com.",
+			wantType: "NS",
+			wantTTL:  172800,
 			wantValues: []string{
 				"ns-1234.awsdns-12.org.",
 				"ns-5678.awsdns-34.co.uk.",
@@ -311,4 +311,3 @@ func TestRecordTypeString(t *testing.T) {
 		})
 	}
 }
-

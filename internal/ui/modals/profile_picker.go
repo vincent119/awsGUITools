@@ -15,12 +15,12 @@ type ProfileInfo = profile.Info
 
 // ProfilePicker 顯示 AWS Profile 選擇器。
 type ProfilePicker struct {
-	list      *tview.List
-	flex      *tview.Flex
-	onSelect  func(info profile.Info)
-	onCancel  func()
-	profiles  []profile.Info
-	current   string
+	list     *tview.List
+	flex     *tview.Flex
+	onSelect func(info profile.Info)
+	onCancel func()
+	profiles []profile.Info
+	current  string
 }
 
 // NewProfilePicker 建立 Profile 選擇器。
@@ -142,5 +142,3 @@ func (p *ProfilePicker) SetOnCancel(onCancel func()) {
 func (p *ProfilePicker) UpdateTitle(count int) {
 	p.list.SetTitle(fmt.Sprintf(" %s ", i18n.Tf("profile.select.title_count", count)))
 }
-
-

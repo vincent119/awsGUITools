@@ -11,12 +11,12 @@ import (
 
 func TestParser_Parse(t *testing.T) {
 	tests := []struct {
-		name            string
-		configContent   string
-		credsContent    string
-		wantProfiles    []string
-		wantRegions     map[string]string
-		wantErr         bool
+		name          string
+		configContent string
+		credsContent  string
+		wantProfiles  []string
+		wantRegions   map[string]string
+		wantErr       bool
 	}{
 		{
 			name: "basic config with default and named profiles",
@@ -329,4 +329,3 @@ aws_access_key_id = AKIA123
 		t.Errorf("region = %q, want %q", info.Region, "custom-region")
 	}
 }
-

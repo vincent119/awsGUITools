@@ -120,4 +120,3 @@ func GetRecordTypeColor(recordType types.RRType) string {
 		return "[white]"
 	}
 }
-

@@ -40,13 +40,13 @@ type Service struct {
 	timeout time.Duration
 	state   *state.Store
 
-	ec2Repo      *repo.EC2Repository
-	rdsRepo      *repo.RDSRepository
-	s3Repo       *repo.S3Repository
-	lambdaRepo   *repo.LambdaRepository
-	route53Repo  *repo.Route53Repository
-	metricFetch  metrics.MetricAPI
-	logFetch     *logs.Fetcher
+	ec2Repo     *repo.EC2Repository
+	rdsRepo     *repo.RDSRepository
+	s3Repo      *repo.S3Repository
+	lambdaRepo  *repo.LambdaRepository
+	route53Repo *repo.Route53Repository
+	metricFetch metrics.MetricAPI
+	logFetch    *logs.Fetcher
 
 	mu    sync.RWMutex
 	cache map[Kind]map[string]models.DetailView
@@ -630,10 +630,10 @@ func buildRoute53RecordList(records []models.Route53Record, zoneName string, mat
 		})
 		details[id] = models.DetailView{
 			Overview: map[string]string{
-				"Name":   record.Name,
-				"Type":   record.Type,
-				"TTL":    fmt.Sprintf("%d", record.TTL),
-				"Zone":   zoneName,
+				"Name": record.Name,
+				"Type": record.Type,
+				"TTL":  fmt.Sprintf("%d", record.TTL),
+				"Zone": zoneName,
 			},
 			Relations: map[string][]string{
 				"Values": record.Values,

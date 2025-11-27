@@ -310,4 +310,3 @@ func (l *List) Names() []string {
 func (l *List) HasProfiles() bool {
 	return len(l.Profiles) > 0
 }
-

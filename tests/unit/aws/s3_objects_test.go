@@ -30,14 +30,14 @@ func TestS3Repository_ListObjects(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name        string
-		bucket      string
-		prefix      string
-		mockOutput  *s3.ListObjectsV2Output
-		wantCount   int
-		wantDirs    int
-		wantFiles   int
-		wantErr     bool
+		name       string
+		bucket     string
+		prefix     string
+		mockOutput *s3.ListObjectsV2Output
+		wantCount  int
+		wantDirs   int
+		wantFiles  int
+		wantErr    bool
 	}{
 		{
 			name:   "empty bucket",
@@ -261,4 +261,3 @@ func formatSizeForTest(bytes int64) string {
 
 // 確保 middleware 套件被引用（避免 unused import）
 var _ middleware.Metadata
-

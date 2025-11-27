@@ -191,4 +191,3 @@ func TestSupportedLanguages(t *testing.T) {
 		t.Error("SupportedLanguages() missing TraditionalChinese")
 	}
 }
-
