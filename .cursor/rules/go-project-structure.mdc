@@ -1,0 +1,121 @@
+---
+description: 專案檔案與目錄結構規範（Go Backend）
+globs: "**/*"
+alwaysApply: true
+---
+
+# 專案檔案與目錄結構規範
+
+本規則定義本倉庫的目錄劃分與檔案命名原則，確保一致性、可維護性與可擴展性。所有新檔與重構需遵循本規則；如與現有程式碼有衝突，以本檔優先（除非另有專案內明確說明）。
+
+---
+
+## 目錄總覽（建議結構）
+
+```text
+/cmd/main.go    # 應用進入點；僅進行依賴注入、初始化與啟動，不含業務邏輯
+/internal/...         # 僅供本模組使用的封裝邏輯（封裝 service、repository、adapter 等，外部無法 import）
+/pkg/...              # 穩定且可重用的公開 API（供其他模組或工具匯入使用）
+/api/...              # 對外契約層（OpenAPI、protobuf、GraphQL schema）；生成的 stub/server/client 亦放此層
+/configs/...          # 預設設定、環境樣板與設定載入程式（config.yaml, env.example 等）
+/scripts/...          # 開發、測試、部署、CI/CD 用腳本（bash、make、python 等）
+Dockerfile                 # 應用容器化描述；建議採 multi-stage，含 lint / test / build 階段
+.dockerignore              # Docker build 忽略清單（排除編譯輸出、暫存檔與測試資料）
+.gitignore                 # Git 忽略清單（node_modules、vendor、log、tmp 等）
+Makefile                   # 常用開發指令（tidy、lint、test、bench、build、run 等封裝）
+.golangci.yml              # 靜態分析與 Linter 設定（統一風格與品質門檻）
+README.md                  # 專案說明：目的、架構、建置步驟、測試與部署指引
+LICENSE                    # 授權條款；內部專案可標註版權與使用限制
+go.mod                     # Go 模組定義與依賴版本管理
+go.sum                     # 依賴模組驗證雜湊清單（確保可重建性）
+docs/                      # 文件與設計說明
+.github/                 # GitHub 工作流程與模板
+.gitlab/                  # Gitlab 工作流程與模板
+test/                    # 測試資產（共享測試工具、整合/端對端測試）
+tools/                   # 開發輔助小工具（不屬於產品程式碼路徑）
+```
+
+---
+
+## Go 專屬約束
+
+- cmd/：
+
+  - 單應用：入口為 `cmd/main.go`，僅包含最少量的組裝/相依注入；禁止業務邏輯
+  - 多應用：每個子資料夾一個獨立應用，入口為 `cmd/<app>/main.go`
+  - 以上情境皆須保持 `main.go` 僅做啟動與 DI，不承載業務邏輯
+
+- internal/domain-name/：
+
+  - 以領域劃分子資料夾，例如 `internal/user`, `internal/order`。
+  - 分層清楚（舉例）：`handler/`（HTTP/gRPC 邊界）、`service/`（用例/協調）、`repository/`（資料存取）、`entity/`（領域模型）。
+  - 禁止跨無關領域的直接耦合；透過介面或用例層協作。
+
+- pkg/：
+
+  - 僅放對外可重用的穩定 API。發布前需要完整 GoDoc、版本穩定承諾與測試。
+  - 避免將專案內部強耦合的邏輯放入 `pkg/`，此類邏輯應放 `internal/`。
+
+- api/（Proto 建議）：
+  - 採用 `api/<domain>/v1/*.proto` 結構；`package` 命名 `domain.v1`。
+  - `go_package` 必須為完整 module path，並固定產碼版本。
+  - 產生的 Go 程式碼統一放置於 `internal/gen/...`；禁止手改產生檔。
+
+---
+
+## 檔案與命名規範
+
+- 目錄命名：全小寫，避免空白；建議使用短語義單字。避免 `util`、`common` 等含糊命名。
+- 套件（package）命名：全小寫、無底線，與目錄語意一致；詳見「Go Style 規範」。
+- Go 檔名：全小寫，可使用底線分隔（Go 慣例），例如 `http_server.go`；測試檔以 `_test.go` 結尾。
+- 其他資產：
+  - YAML/JSON/SQL：檔名採 `kebab-case` 或 `snake_case`，需與用途對應，例如 `app-config.example.yaml`。
+  - 秘密資訊不得進入版本庫；使用 `*.example.*` 或樣本檔示意。
+
+---
+
+## 測試與資料夾
+
+- 單元測試與被測模組同層放置（`foo_test.go`）。
+- 共用測試工具與整合測試置於 `test/`：
+  - `test/integration/`、`test/e2e/` 等明確區分。
+  - 長時間或需要外部資源的測試採 build tags（`//go:build integration`）。
+
+---
+
+## 生成產物與工具
+
+- 原則上不提交生成產物；如因 CI 或使用者便捷需要提交，必須：
+  - 放於固定資料夾（`internal/gen/`）
+  - 在檔頭包含 `// Code generated ... DO NOT EDIT.` 提示
+  - 在 README 或生成設定（如 `buf.gen.yaml`、`Makefile`）說明產生流程
+
+---
+
+## 設定與機密
+
+- `configs/` 僅放樣本或非敏感設定：
+  - `config.example.yaml`、`.env.example`，並在 README 說明如何複製成實際檔案
+- 機密透過環境變數或密鑰管理（Vault/Secrets Manager），禁止硬編碼與提交。
+
+---
+
+## 資料庫與遷移
+
+- 所有 Schema 變更透過 `migrations/` 管理；禁止直接變更 DB 結構而不經遷移。
+- 以遷移工具（如 goose/tern/migrate）管理版本與回滾，檔名需包含時間戳與清楚描述。
+
+---
+
+## CI/CD 與自動化
+
+- CI 設定置於 `.github/workflows/`，共用腳本置於 `scripts/`。
+- 建議 Make 目標：
+  - `make lint`、`make test`、`make build`、`make proto`、`make fmt`
+
+---
+
+## 溝通與維護
+
+- 每個頂層目錄應有最小化 README（如有非顯而易見的結構或流程）。
+- 大型重構需更新本規則或在 PR 描述清楚偏離處與理由。

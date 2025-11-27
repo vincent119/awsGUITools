@@ -1,0 +1,10 @@
+{
+  "name": "dark",
+  "primitive_background": "#1d1f21",
+  "contrast_background": "#2d2f31",
+  "text": "#f0f0f0",
+  "secondary_text": "#b5bd68",
+  "border": "#373b41",
+  "selection": "#81a2be"
+}
+

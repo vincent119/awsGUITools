@@ -1,0 +1,287 @@
+---
+description: Go 開發規範（Cursor 專用，整合 Uber Go Style Guide 與專案實務）
+globs:
+  - "**/*.go"
+  - "go.mod"
+  - "go.sum"
+alwaysApply: true
+---
+
+# Go 開發規範（Cursor 專用，整合 Uber Go Style Guide）
+
+本規範延伸自：
+
+- `.github/standards/copilot-common.md`
+- `.github/standards/copilot-vocabulary.yaml`
+- [Uber Go 風格指南（繁體中文維護版）](https://github.com/ianchen0119/uber_go_guide_tw)
+- [Effective Go（官方）](https://go.dev/doc/effective_go#introduction)
+
+Go 版本目標：**Go 1.22+**（若專案內明確指定其他版本，以專案為準）。
+
+> 目標：統一格式、用詞與安全實務，確保 Cursor 產生的程式碼符合 idiomatic Go，並可直接編譯、部署與維護。
+
+---
+
+## 1. 檔案與 package 規範
+
+- 每個檔案僅允許 **一行** `package <name>` 宣告，且置於檔案最上方。
+- 編輯既有檔案時：**保留原 package** 名稱，不任意改動。
+- 新增檔案時：package 名稱需與同資料夾既有 `.go` 檔一致。
+- 可執行程式置於 `cmd/main.go`（單應用）或 `cmd/<app>/main.go`（多應用）；library package 不得含 `main()` 函式。
+- package 名稱需遵守：
+  - 全小寫
+  - 不使用底線
+  - 儘量為單一詞彙且具語意（避免 `util`、`common` 這種含糊命名）。
+
+---
+
+## 2. Imports 與工具假設
+
+- 所有輸出的程式碼，預期可通過：
+  - `gofmt -s`
+  - `goimports`
+  - `go vet`
+- 自動清除未使用的 imports，避免循環依賴與髒 imports。
+- Imports 排序遵守三層結構：
+  1. 標準庫
+  2. 第三方套件
+  3. 專案內部套件  
+     以上三組之間以空行分隔。
+- 若修改 `go.mod` 內容，應在說明中提示需要執行 `go mod tidy`（僅提示，不假設已執行）。
+
+---
+
+## 3. 錯誤處理與控制流程
+
+- 所有會回傳 `error` 的呼叫，應在**下一行立即檢查 `err`**，採用 early return 風格：
+
+  ```go
+  v, err := doSomething()
+  if err != nil {
+      return ..., fmt.Errorf("doing something: %w", err)
+  }
+  ```
+
+- 使用 `fmt.Errorf("context: %w", err)` 進行錯誤包裝，跨層以 `errors.Is` / `errors.As` 判斷。
+- 錯誤訊息格式：
+  - 以小寫字母開頭
+  - 結尾不加標點符號
+- 僅在「無法恢復且屬於程式設計錯誤或初始化致命錯誤」時使用 `panic`；
+  - library、業務邏輯層禁止使用 `panic`。
+- 禁止「只記錄不回傳」的錯誤吞沒行為：
+  - 要嘛在當前層級完整處理錯誤
+  - 要嘛將錯誤（包裝後）往上傳遞，由上層統一處理。
+
+---
+
+## 4. 並行與 I/O 安全
+
+- 每個 goroutine 必須具有**清楚的生命週期與退出機制**：
+  - 使用 `context.Context`、`sync.WaitGroup` 或 `errgroup` 控制。
+- Channel 預設緩衝大小為 0 或 1，除非有量測或明確需求才增大。
+- 嚴禁 goroutine 洩漏；所有背景工作應能在 context 取消或程式結束時正常回收。
+- 所有實作 `io.Closer` 的資源必須在使用完后關閉：
+  - HTTP 回應 `resp.Body`
+  - 資料庫 `Rows`、`Stmt`
+  - 檔案 handle 等
+- 不可重用已讀取的 `req.Body`；若需要重播，需 clone buffer：
+
+  ```go
+  buf := bytes.Clone(src)
+  req.Body = io.NopCloser(bytes.NewReader(buf))
+  req.GetBody = func() (io.ReadCloser, error) {
+      return io.NopCloser(bytes.NewReader(buf)), nil
+  }
+  ```
+
+- 使用 `io.Pipe` 或 multipart 寫入時：
+  - 由單一 goroutine 依序寫入
+  - 發生錯誤時使用 `pw.CloseWithError(err)`
+  - 正常結束時先 `mw.Close()` 再 `pw.Close()`
+- 在邊界（函式輸入/輸出、public API）傳遞 slice/map 時，必要時使用 `copy()` 建立新切片，避免共享底層記憶體造成意外 side effect。
+
+---
+
+## 5. HTTP Client 設計與 Net/HTTP 實務
+
+- HTTP Client 型別只保存**不可變設定**：
+  - `BaseURL`
+  - `*http.Client`
+  - 預設 headers / options  
+    禁止在 client struct 中保存 `*http.Request` 或可變請求狀態。
+- 所有對外 HTTP 方法：
+  - 第一個參數為 `ctx context.Context`
+  - 內部建立 `http.Request`：`http.NewRequestWithContext(ctx, ...)`
+  - 呼叫 `c.httpClient.Do(req)` 並 `defer resp.Body.Close()`
+  - 在讀取 `resp.Body` 前先檢查 `resp.StatusCode`
+- HTTP Client 與 Transport 建議配置：
+
+  ```go
+  tr := &http.Transport{
+      MaxIdleConns:        100,
+      IdleConnTimeout:     90 * time.Second,
+      TLSHandshakeTimeout: 10 * time.Second,
+      ExpectContinueTimeout: 1 * time.Second,
+  }
+  c := &http.Client{
+      Transport: tr,
+      Timeout:   15 * time.Second, // 全域上限；更細粒度以 context 控制
+  }
+  ```
+
+- 重試策略要求：
+  - 僅對冪等方法（如 GET）實作重試
+  - 必須具備最大重試次數與退避（backoff）
+  - 對暫時性錯誤（5xx、網路錯誤）可重試；對業務邏輯錯誤（4xx）不重試。
+
+---
+
+## 6. JSON / Struct Tag 規範
+
+- 對外輸入/輸出使用的 struct 必須加上 `json` tag：
+  - 命名風格依專案現有慣例（`snake_case` 或 `camelCase`）保持一致。
+- 對於選填欄位使用 `omitempty` 避免輸出多餘欄位。
+- 解碼外部 JSON 時，預設採用「拒絕未知欄位」策略：
+
+  ```go
+  dec := json.NewDecoder(r)
+  dec.DisallowUnknownFields()
+  ```
+
+- 優先使用具體型別，僅在必要時使用 `any`。
+- 時間欄位採用 RFC3339 格式（UTC 優先）；如需使用本地時間或含 offset，需清楚註明語意。
+
+---
+
+## 7. 一般 Go 開發風格（整合 Uber + Effective Go）
+
+- 清晰優於巧妙：
+  - 主流程靠左排列，盡量降低巢狀層級。
+  - 使用 guard clause（early return）簡化邏輯。
+- 註解應說明「為何如此設計」，而不是重述程式碼行為。
+- 命名慣例：
+  - 變數/函式：小駝峰，小範圍內可用 `i`、`j`、`err`、`ctx`。
+  - 匯出名稱：首字母大寫，需具語意並加 GoDoc 註解。
+  - 介面名稱建議以 `-er` 結尾（如 `Reader`、`Writer`），介面應小而精。
+  - package 命名：詳見「1. 檔案與 package 規範」
+- 縮略詞大小寫一致，例如：
+  - `HTTPServer`
+  - `URLParser`
+- 建構子命名採 `NewType(...)` 風格，必要時使用 `WithXxx` 選項，但避免過度抽象或深層 builder。
+
+---
+
+## 8. context 使用規範
+
+- 外部可阻塞的公開 API，第一個參數必須為 `ctx context.Context`。
+- 禁止在深層呼叫中直接使用 `context.Background()` 取代上游 context。
+- 超時與截止時間應在呼叫邊界（如 HTTP handler、CLI entry）設定，內部尊重 `ctx.Done()`。
+- 不得將 `context.Context` 儲存在 struct 欄位中；一律以參數傳遞。
+
+---
+
+## 9. 並行進階規範
+
+- 建議使用 `errgroup.WithContext` 或 `sync.WaitGroup` + `ctx` 來管理多 goroutine 的協作與錯誤收斂。
+- 共享狀態需使用 `sync.Mutex` / `sync.RWMutex` 或經過設計的無鎖結構保護。
+- 在 `for range` 中建立 goroutine 時，要重新宣告 loop 變數，避免閉包捕獲錯誤：
+
+  ```go
+  for _, v := range list {
+      v := v
+      go func() {
+          _ = v
+      }()
+  }
+  ```
+
+---
+
+## 10. 測試與範例
+
+- 單元測試採用 **table-driven tests** 風格，並使用 `t.Run` 建立子測試。
+- 測試輔助函式應使用 `t.Helper()` 標記，必要時利用 `t.Cleanup()` 做清理。
+- 若為匯出 API，建議提供對應的 `example_test.go` 作為使用示例。
+- 預設使用標準 `testing` 套件；除非專案已有既定選擇，否則不主動引入第三方 assertion 套件。
+- 對關鍵程式路徑，建議提供：
+  - 基準測試（`go test -bench=. -benchmem`）
+  - 必要的 fuzz 測試（特別是字串處理與 parser 類邏輯）。
+
+---
+
+## 11. 日誌與可觀測性
+
+- 使用**結構化日誌**（如 `zap` ），並維持固定欄位：
+  - `trace_id`
+  - `span_id`
+  - `req_id`
+  - `subsystem`
+- 記錄錯誤時，使用例如：
+  - `logger.Error("msg", zap.Error(err))`
+- 避免將 `err.Error()` 再次拼進訊息字串中重複記錄。
+- 若專案採用 OpenTelemetry，HTTP / DB client 優先使用已 instrument 的實作，以便追蹤。
+
+---
+
+## 12. 時間、時區與安全性
+
+- 內部邏輯與資料儲存盡可能使用 UTC 時間；輸出展示時再依需求轉換時區。
+- JSON 時間欄位建議使用 RFC3339 格式，必要時使用 `time.RFC3339Nano`。
+- 僅使用標準 `crypto/*` 套件，禁止自行實作加解密演算法。
+- 所有外部輸入需檢查格式與長度，避免資源耗盡或 ReDoS。
+- 檔案 I/O 建議利用 `fs.FS` 或限制範圍的路徑處理，避免路徑穿越（Zip Slip 等）。
+
+---
+
+## 13. 依賴與模組管理
+
+- 模組遵循 SemVer；若有破壞性變更應使用 major path（例如 `/v2`）。
+- `go.mod` 應保持最小依賴集，避免不必要 transitive 依賴。
+- 新增依賴時需有合理用途與說明；移除依賴後建議執行 `go mod tidy`。
+
+---
+
+## 14. Cursor 產生內容的要求（重點）
+
+- 產生程式碼時，**優先輸出完整可編譯的檔案**；若為修改，應提供清晰區塊，避免半成品。
+- 不得只給出片段建議而不完成必要邏輯。
+- 不得臆測專案結構與相依；若需要資訊，應假設先閱讀：
+  - `go.mod`
+  - `README.md`
+  - 相關 `internal/`、`pkg/`、`api/` 內容
+- 若引入新第三方套件，須在說明中清楚指出用途與大致風險，並提供 `go get module@version` 建議。
+- 若專案現有風格與本規範有輕微差異，**以專案現有風格優先**，但不得違反本檔中關於正確性與安全性的條款。
+
+---
+
+## 15. 介面與泛型（Generics）
+
+- 介面以使用者需求定義，**小而精**，避免大型「上帝介面」
+- 實作端不主動暴露介面；由呼叫端定義最小介面以便於測試與替換
+- 泛型僅在可讀性與可重用性明顯提升時使用；避免過度抽象
+- 對性能敏感的泛型資料結構，須提供基準測試佐證（`go test -bench=. -benchmem`）
+
+---
+
+## 16. 常量與「魔數」管理
+
+- 避免魔數與硬編碼字串；以 `const` 或具語意的變數承載
+- 跨套件共用的常量置於語意清楚的位置（避免建立「雜物包」）
+- 時間與重試次數等參數應集中於設定或構造函式參數
+
+---
+
+## 17. 可測性與依賴注入
+
+- 依賴外部資源（時間、隨機、IO、HTTP、DB）以介面或函式注入
+- 時間請注入 `Now()` 型函式或 `clock` 介面，以避免測試不穩定
+- 隨機來源（如 `rand.Rand`）於測試可注入固定種子
+- 邊界層優先採用 `io.Reader` / `io.Writer` 以利測試與組合
+
+---
+
+## 18. Build Tags 與工具指示
+
+- 使用 `//go:build <tag>` 宣告（Go 1.17+），避免舊式 `// +build`
+- 僅在必要時使用 build tags（如 `integration`、`e2e`）；預設單元測試不依賴 tags
+- 工具指示（如 `//go:nocheckptr`）需附上註解說明理由與風險，並儘量避免於一般邏輯出現

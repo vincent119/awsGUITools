@@ -1,0 +1,38 @@
+---
+
+description: 在 Go 中實作 gRPC 服務時的指引與最佳實務。
+globs: **/grpc/**/*.go
+alwaysApply: true
+---
+
+# Go GRPC
+
+在使用 Go 開發 gRPC 服務時：
+
+- 定義你的 Protocol Buffer 訊息與服務。
+- 使用 `protoc` 根據 `.proto` 檔案產生 Go 程式碼。
+- 在 Go 中實作 gRPC 伺服器，正確處理請求與回應。
+- 使用 Go 的 `database/sql` 套件或 ORM 連接資料庫。
+- 妥善處理錯誤並執行適當的資料驗證。
+- 若資料模型或查詢邏輯較複雜，可考慮使用 GORM 等 ORM。
+- 遵循安全性最佳實務，例如使用預備語句防止 SQL 注入。
+
+## 伺服器攔截器與觀測性
+
+- 建議啟用 unary/stream 攔截器：logging、metrics、tracing、recovery。
+- 將 `trace_id` / `req_id` 納入日誌欄位；錯誤以 `status.Status` 統一輸出。
+
+## 連線與超時
+
+- 預設 per-RPC deadline；服務端 `Keepalive`, `MaxRecvMsgSize`, `MaxSendMsgSize` 視需求設定。
+- 客戶端採指數退避的重試策略，僅對冪等請求啟用。
+
+## 安全性
+
+- 強制 TLS，內網可考慮 mTLS；私網反射與健康檢查可開，公網關閉或限制。
+- 授權建議透過 per-RPC credentials 或 metadata token；避免在訊息體攜帶敏感資料。
+
+## 錯誤映射
+
+- 業務錯誤映射到對應的 gRPC status code；必要時附帶 `google.rpc.ErrorInfo`。
+- 嚴禁以 500/Unknown 隨意帶過可分類的業務錯誤。

@@ -1,0 +1,75 @@
+---
+description: 規範本倉庫的 Git 提交訊息格式（Conventional Commits 1.0.0，繁體中文）
+globs: "**/*"
+alwaysApply: true
+---
+
+# Conventional Commits（提交訊息規範）
+
+本規則要求所有提交訊息遵循 Conventional Commits 1.0.0。目標：一致化提交歷史、便於自動產出 Changelog 與版本管理（SemVer）。
+
+## 提交格式
+
+```text
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+說明：
+
+- type（必填）：`feat` | `fix` | `docs` | `chore` | `refactor` | `style` | `perf` | `test` | `build` | `ci` | `revert`
+- scope（可選）：以括號包覆的模組/範圍，例如 `api`、`db`、`grpc`
+- description（必填）：簡潔動詞開頭描述，使用現在式（例：add、fix、refactor）
+- body（可選）：必要的背景脈絡、動機、設計重點
+- footer（可選）：引用、關聯、重大變更等（例如 `Refs: #123`、`BREAKING CHANGE: ...`）
+
+## 重大變更
+
+- 任一類型皆可標記重大變更：
+  - 以驚嘆號：`feat(api)!: ...`
+  - 或在頁腳以：`BREAKING CHANGE: ...`
+- 對應 SemVer 規則：`MAJOR` 版本遞增
+
+## SemVer 映射
+
+- `fix`: PATCH
+- `feat`: MINOR
+- `BREAKING CHANGE`: MAJOR
+
+## 範例
+
+```text
+feat: allow provided config object to extend other configs
+
+BREAKING CHANGE: `extends` key in config file is now used for extending other config files
+```
+
+```text
+feat(api)!: send an email to the customer when a product is shipped
+```
+
+```text
+docs: correct spelling of CHANGELOG
+```
+
+```text
+fix: prevent racing of requests
+
+Introduce a request id and reference to latest request. Dismiss older responses.
+Refs: #123
+```
+
+## 編寫指引（AI 執行規則）
+
+- 當需要建立提交時，必須輸出符合上述格式的提交訊息
+- 優先選擇正確的 type 與清楚的 scope，避免籠統描述
+- 有破壞性變更時必須標記 `!` 或 `BREAKING CHANGE:` 並附清楚遷移說明
+- 提交盡量原子化，避免單一提交混合多種不相干改動
+
+## 建議工具（可選）
+
+- commitlint（`@commitlint/config-conventional`）
+- 以 CI 驗證提交訊息格式，阻擋不合規的提交
