@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/vin/ck123gogo/internal/aws/session"
+	"github.com/vincent119/awsGUITools/internal/aws/session"
 )
 
 // Factory 根據 profile/region 產生各 AWS 服務的 client。

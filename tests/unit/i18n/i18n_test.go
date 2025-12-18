@@ -4,7 +4,7 @@ package i18n_test
 import (
 	"testing"
 
-	"github.com/vin/ck123gogo/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/i18n"
 )
 
 func TestTranslator_BasicTranslation(t *testing.T) {

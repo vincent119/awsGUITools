@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 
-	"github.com/vin/ck123gogo/internal/models"
+	"github.com/vincent119/awsGUITools/internal/models"
 )
 
 // Route53Repository 封裝 Route53 查詢邏輯。

@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	"github.com/vin/ck123gogo/internal/models"
+	"github.com/vincent119/awsGUITools/internal/models"
 )
 
 type RDSRepository struct{}

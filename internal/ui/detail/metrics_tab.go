@@ -7,7 +7,7 @@ import (
 
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/aws/metrics"
+	"github.com/vincent119/awsGUITools/internal/aws/metrics"
 )
 
 // MetricsTab 顯示 CloudWatch 指標。

@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/smithy-go/middleware"
 
-	"github.com/vin/ck123gogo/internal/ops"
+	"github.com/vincent119/awsGUITools/internal/ops"
 )
 
 // mockEC2Client 實作 ops.EC2API 介面。

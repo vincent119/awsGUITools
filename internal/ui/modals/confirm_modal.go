@@ -7,7 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/i18n"
 )
 
 // ConfirmModal 顯示操作確認對話框。

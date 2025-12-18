@@ -6,8 +6,8 @@ import (
 
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/i18n"
-	"github.com/vin/ck123gogo/internal/service/resource"
+	"github.com/vincent119/awsGUITools/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/service/resource"
 )
 
 // StatusBar 顯示目前 profile/region/theme/resource 狀態。

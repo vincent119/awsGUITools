@@ -4,7 +4,7 @@ package keymap
 import (
 	"fmt"
 
-	"github.com/vin/ck123gogo/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/i18n"
 )
 
 // HelpText is kept for backward compatibility (English only).

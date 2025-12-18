@@ -7,7 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/tags"
+	"github.com/vincent119/awsGUITools/internal/tags"
 )
 
 // TagsEditor 提供標籤編輯介面。

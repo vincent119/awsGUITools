@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go/middleware"
 
-	"github.com/vin/ck123gogo/internal/aws/repo"
+	"github.com/vincent119/awsGUITools/internal/aws/repo"
 )
 
 // mockS3Client 實作 S3 ListObjectsV2 的 mock。

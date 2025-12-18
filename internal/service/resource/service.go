@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vin/ck123gogo/internal/app/state"
-	"github.com/vin/ck123gogo/internal/aws/clients"
-	"github.com/vin/ck123gogo/internal/aws/logs"
-	"github.com/vin/ck123gogo/internal/aws/metrics"
-	"github.com/vin/ck123gogo/internal/aws/repo"
-	"github.com/vin/ck123gogo/internal/models"
-	"github.com/vin/ck123gogo/internal/observability"
-	"github.com/vin/ck123gogo/internal/search"
+	"github.com/vincent119/awsGUITools/internal/app/state"
+	"github.com/vincent119/awsGUITools/internal/aws/clients"
+	"github.com/vincent119/awsGUITools/internal/aws/logs"
+	"github.com/vincent119/awsGUITools/internal/aws/metrics"
+	"github.com/vincent119/awsGUITools/internal/aws/repo"
+	"github.com/vincent119/awsGUITools/internal/models"
+	"github.com/vincent119/awsGUITools/internal/observability"
+	"github.com/vincent119/awsGUITools/internal/search"
 )
 
 // Kind 表示資源類型。

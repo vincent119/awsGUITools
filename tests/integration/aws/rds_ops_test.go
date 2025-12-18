@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/rds/types"
 
-	"github.com/vin/ck123gogo/internal/ops"
+	"github.com/vincent119/awsGUITools/internal/ops"
 )
 
 // mockRDSClient 實作 ops.RDSAPI 介面。

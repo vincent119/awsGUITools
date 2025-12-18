@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 
-	"github.com/vin/ck123gogo/internal/aws/repo"
-	"github.com/vin/ck123gogo/internal/models"
+	"github.com/vincent119/awsGUITools/internal/aws/repo"
+	"github.com/vincent119/awsGUITools/internal/models"
 )
 
 func TestRoute53Repository_NilClient(t *testing.T) {

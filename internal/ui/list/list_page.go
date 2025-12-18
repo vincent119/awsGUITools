@@ -7,8 +7,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/i18n"
-	"github.com/vin/ck123gogo/internal/models"
+	"github.com/vincent119/awsGUITools/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/models"
 )
 
 // View 負責呈現資源清單。

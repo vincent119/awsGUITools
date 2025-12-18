@@ -4,7 +4,7 @@ package search_test
 import (
 	"testing"
 
-	"github.com/vin/ck123gogo/internal/search"
+	"github.com/vincent119/awsGUITools/internal/search"
 )
 
 func TestMatcherMatch(t *testing.T) {

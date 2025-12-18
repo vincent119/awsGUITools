@@ -6,8 +6,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/vin/ck123gogo/internal/aws/profile"
-	"github.com/vin/ck123gogo/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/aws/profile"
+	"github.com/vincent119/awsGUITools/internal/i18n"
 )
 
 // ProfileInfo is an alias for profile.Info for external use.

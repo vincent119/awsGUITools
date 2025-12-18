@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/vin/ck123gogo/internal/tags"
+	"github.com/vincent119/awsGUITools/internal/tags"
 )
 
 // mockEC2TagClient 實作 tags.EC2TagAPI。

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vin/ck123gogo/internal/aws/profile"
+	"github.com/vincent119/awsGUITools/internal/aws/profile"
 	"gopkg.in/yaml.v3"
 )
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/vin/ck123gogo/internal/app"
+	"github.com/vincent119/awsGUITools/internal/app"
 )
 
 var (

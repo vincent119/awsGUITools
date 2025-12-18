@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
-	"github.com/vin/ck123gogo/internal/aws/logs"
+	"github.com/vincent119/awsGUITools/internal/aws/logs"
 )
 
 type stubLogsClient struct {

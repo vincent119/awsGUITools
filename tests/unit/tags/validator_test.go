@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vin/ck123gogo/internal/tags"
+	"github.com/vincent119/awsGUITools/internal/tags"
 )
 
 func TestValidateKey_Empty(t *testing.T) {

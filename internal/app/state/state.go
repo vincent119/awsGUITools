@@ -4,7 +4,7 @@ package state
 import (
 	"sync"
 
-	"github.com/vin/ck123gogo/internal/aws/profile"
+	"github.com/vincent119/awsGUITools/internal/aws/profile"
 )
 
 // Store 保存應用的全域狀態，例如 profile/region/theme/language 與搜尋條件。

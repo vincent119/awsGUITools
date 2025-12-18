@@ -13,109 +13,500 @@ alwaysApply: true
 ## 目錄總覽（建議結構）
 
 ```text
-/cmd/main.go    # 應用進入點；僅進行依賴注入、初始化與啟動，不含業務邏輯
-/internal/...         # 僅供本模組使用的封裝邏輯（封裝 service、repository、adapter 等，外部無法 import）
-/pkg/...              # 穩定且可重用的公開 API（供其他模組或工具匯入使用）
-/api/...              # 對外契約層（OpenAPI、protobuf、GraphQL schema）；生成的 stub/server/client 亦放此層
-/configs/...          # 預設設定、環境樣板與設定載入程式（config.yaml, env.example 等）
-/scripts/...          # 開發、測試、部署、CI/CD 用腳本（bash、make、python 等）
-Dockerfile                 # 應用容器化描述；建議採 multi-stage，含 lint / test / build 階段
-.dockerignore              # Docker build 忽略清單（排除編譯輸出、暫存檔與測試資料）
-.gitignore                 # Git 忽略清單（node_modules、vendor、log、tmp 等）
-Makefile                   # 常用開發指令（tidy、lint、test、bench、build、run 等封裝）
-.golangci.yml              # 靜態分析與 Linter 設定（統一風格與品質門檻）
-README.md                  # 專案說明：目的、架構、建置步驟、測試與部署指引
-LICENSE                    # 授權條款；內部專案可標註版權與使用限制
-go.mod                     # Go 模組定義與依賴版本管理
-go.sum                     # 依賴模組驗證雜湊清單（確保可重建性）
-docs/                      # 文件與設計說明
-.github/                 # GitHub 工作流程與模板
-.gitlab/                  # Gitlab 工作流程與模板
-test/                    # 測試資產（共享測試工具、整合/端對端測試）
-tools/                   # 開發輔助小工具（不屬於產品程式碼路徑）
+.
+├── cmd/
+│   ├── api/                      # HTTP API 入口（Gin）
+│       └── main.go
+├── internal/                     # 專案內部（不對外 export）
+│   ├── domain/                   # 企業核心：Entity/ValueObject/Domain Service
+│   │   ├── model/                # 聚合根、Entity、VO
+│   │   ├── errors/               # Domain error（可辨識、可比對）
+│   │   └── event/                # Domain events（可選）
+│   │
+│   ├── app/                      # Use cases / Application services（核心流程）
+│   │   ├── command/              # 會改變狀態的用例（Create/Update/Submit...）
+│   │   ├── query/                # 查詢用例（Read model / View）
+│   │   └── dto/                  # 用例層 DTO（與 HTTP/DB model 分離）
+│   │
+│   ├── ports/                    # Ports：核心對外依賴的介面（反轉依賴點）
+│   │   ├── repo/                 # Repository ports（DB 抽象）
+│   │   ├── cache/                # Cache ports（Redis 抽象）
+│   │   ├── notifier/             # 通知 ports（Email/LINE/FCM）
+│   │   ├── storage/              # 物件儲存 ports（S3）
+│   │   ├── idgen/                # ID 產生器 ports（UUID/KSUID）
+│   │   ├── clock/                # 時間 ports（測試友善）
+│   │   └── tx/                   # Transaction ports（Unit of Work）
+│   │
+│   ├── adapters/                 # Adapters：外部實作（Framework/Drivers）
+│   │   ├── http/                 # Inbound adapter：Gin handlers / middleware
+│   │   │   ├── handler/
+│   │   │   ├── middleware/
+│   │   │   ├── presenter/        # response mapping（可選）
+│   │   │   └── router.go
+│   │   │
+│   │   ├── postgres/             # Outbound adapter：Postgres repo 實作
+│   │   │   ├── db/               # 連線池、tx helper
+│   │   │   ├── repo/             # 實作 internal/ports/repo
+│   │   │   └── mapper/           # domain <-> db model mapping
+│   │   │
+│   │   ├── redis/                # Outbound adapter：Redis cache 實作
+│   │   │   ├── client/
+│   │   │   └── cache/
+│   │   │
+│   │   ├── aws/                  # Outbound adapter：AWS SDK v2 封裝（S3/SES/SNS…）
+│   │   │   ├── config/
+│   │   │   ├── s3/
+│   │   │   ├── ses/
+│   │   │   └── ec2/
+│   │   │
+│   │   ├── queue/                # Outbound adapter：Queue（Redis stream / SQS / Kafka）
+│   │   │   ├── producer/
+│   │   │   └── consumer/
+│   │   │
+│   │   └── notifier/             # Outbound adapter：Email/LINE/FCM 實作
+│   │       ├── email/
+│   │       ├── line/
+│   │       └── fcm/
+│   │
+│   ├── di/                       # 組裝層（依賴注入）
+│   │   ├── wire.go               # 若用 google/wire（可選）
+│   │   └── compose.go            # 手寫 compose（推薦先用手寫）
+│   │
+│   ├── config/                   # 統一讀 env、型別化設定
+│   ├── logger/                   # 結構化 log
+│   ├── observability/            # metrics/tracing（可選）
+│   └── shared/                   # 專案內共用（非 domain）
+│       ├── xerrors/
+│       ├── xjson/
+│       └── xvalidator/
+│
+├── migrations/                   # DB migrations（sql 檔）
+├── scripts/                      # 工具腳本（lint、dev、seed…）
+├── docs/                         # 文件（SDD、ADR、API spec）
+│   ├── SDD.md
+│   ├── ADR/
+│   └── openapi.yaml
+│
+├── go.mod
+└── go.sum
 ```
 
 ---
 
 ## Go 專屬約束
 
-- cmd/：
+### cmd/ - 應用入口
 
-  - 單應用：入口為 `cmd/main.go`，僅包含最少量的組裝/相依注入；禁止業務邏輯
-  - 多應用：每個子資料夾一個獨立應用，入口為 `cmd/<app>/main.go`
-  - 以上情境皆須保持 `main.go` 僅做啟動與 DI，不承載業務邏輯
+- **單一應用**：入口為 `cmd/main.go`，僅包含最少量的組裝與依賴注入
+- **多應用**：每個子資料夾為獨立應用，如 `cmd/api/main.go`、`cmd/worker/main.go`
+- **職責限制**：`main.go` 僅負責啟動與 DI 組裝，禁止包含業務邏輯
+- **組裝模式**：應使用 `internal/di/` 的組裝函式，而非在 main 中直接建構
 
-- internal/domain-name/：
+### internal/ - 核心架構層次
 
-  - 以領域劃分子資料夾，例如 `internal/user`, `internal/order`。
-  - 分層清楚（舉例）：`handler/`（HTTP/gRPC 邊界）、`service/`（用例/協調）、`repository/`（資料存取）、`entity/`（領域模型）。
-  - 禁止跨無關領域的直接耦合；透過介面或用例層協作。
+#### internal/domain/ - 領域核心層
 
-- pkg/：
+- **職責**：定義企業核心概念，包含 Entity、Value Object、Domain Service
+- **model/**：聚合根與實體定義，需包含業務不變量（invariants）
+- **errors/**：領域專屬錯誤，需可辨識、可比對，用於表達業務規則違反
+- **event/**：領域事件（可選），用於領域模型間的解耦通訊
+- **原則**：此層不依賴外部框架，僅依賴標準庫與領域邏輯
 
-  - 僅放對外可重用的穩定 API。發布前需要完整 GoDoc、版本穩定承諾與測試。
-  - 避免將專案內部強耦合的邏輯放入 `pkg/`，此類邏輯應放 `internal/`。
+#### internal/app/ - 應用服務層
 
-- api/（Proto 建議）：
-  - 採用 `api/<domain>/v1/*.proto` 結構；`package` 命名 `domain.v1`。
-  - `go_package` 必須為完整 module path，並固定產碼版本。
-  - 產生的 Go 程式碼統一放置於 `internal/gen/...`；禁止手改產生檔。
+- **職責**：定義並協調 Use Cases，組織業務流程
+- **command/**：會改變狀態的用例（Create、Update、Delete、Submit 等）
+- **query/**：查詢用例，實作 CQRS 的 Read Model/View
+- **dto/**：應用層 DTO，與 HTTP/DB model 分離，避免外層影響核心
+- **原則**：
+  - 透過 Ports 介面依賴外部服務（DB、Cache、第三方 API）
+  - 不直接依賴 Adapters 實作
+  - 包含事務邊界定義
+
+#### internal/ports/ - 依賴反轉介面層
+
+- **職責**：定義核心對外依賴的抽象介面（Dependency Inversion Principle）
+- **repo/**：Repository ports，抽象資料持久化操作
+- **cache/**：Cache ports，抽象快取操作（Redis 等）
+- **notifier/**：通知 ports（Email/LINE/FCM/SMS 等）
+- **storage/**：物件儲存 ports（S3、GCS 等）
+- **idgen/**：ID 產生器 ports（UUID、KSUID、Snowflake）
+- **clock/**：時間 ports（方便測試時間相關邏輯）
+- **tx/**：Transaction ports，實作 Unit of Work 模式
+- **原則**：
+  - 介面定義在核心層，實作在 Adapters 層
+  - 介面應小而精，遵循 Interface Segregation Principle
+
+#### internal/adapters/ - 外部適配器層
+
+- **職責**：實作外部框架、資料庫、第三方服務的具體適配
+
+##### Inbound Adapters（輸入適配器）
+
+- **http/**：HTTP 協議適配（Gin、Echo、標準庫等）
+  - `handler/`：HTTP handlers，負責請求解析與回應格式化
+  - `middleware/`：中介軟體（認證、授權、日誌、限流等）
+  - `presenter/`：Response mapping，將 DTO 轉為 API 回應格式
+  - `router.go`：路由定義與組裝
+- **grpc/**：gRPC 協議適配（可選）
+- **cli/**：命令列介面適配（Cobra 等，可選）
+
+##### Outbound Adapters（輸出適配器）
+
+- **postgres/**：PostgreSQL 實作
+  - `db/`：連線池、連線管理、事務 helper
+  - `repo/`：實作 `internal/ports/repo` 的介面
+  - `mapper/`：Domain model ↔ DB model 轉換
+- **redis/**：Redis 實作
+  - `client/`：連線與設定
+  - `cache/`：實作 `internal/ports/cache` 的介面
+- **aws/**：AWS SDK v2 封裝
+  - `config/`：AWS 設定與 session 管理
+  - `s3/`、`ses/`、`sns/`、`ec2/`：各服務實作對應 ports
+- **queue/**：訊息佇列實作
+  - `producer/`：訊息生產者
+  - `consumer/`：訊息消費者
+  - 支援 Redis Stream、SQS、Kafka 等
+- **notifier/**：通知服務實作
+  - `email/`、`line/`、`fcm/`：實作 `internal/ports/notifier`
+
+**Adapters 原則**：
+
+- 不包含業務邏輯，僅負責協議轉換與技術實作
+- 需通過 Ports 介面與核心層互動
+- 可替換性高，方便測試與遷移
+
+#### internal/di/ - 依賴注入組裝層
+
+- **職責**：組裝所有依賴，將 Adapters 注入到 App/Domain
+- **compose.go**：手寫組裝函式（推薦新專案優先使用）
+- **wire.go**：使用 google/wire 自動產生（可選，適合大型專案）
+- **原則**：
+  - 所有依賴在此層解析與注入
+  - 遵循 Dependency Injection 原則
+  - 方便抽換實作（如測試時使用 mock）
+
+#### internal/config/ - 組態管理
+
+- **職責**：統一讀取環境變數、設定檔，提供型別化組態
+- **來源**：支援環境變數、YAML、JSON 等
+- **原則**：
+  - 使用 struct tags 自動解析
+  - 包含驗證邏輯（必填欄位、格式檢查）
+  - 避免在程式碼各處散落設定讀取
+
+#### internal/logger/ - 日誌管理
+
+- **職責**：提供結構化日誌介面
+- **使用套件**：zlogger（github.com/vincent119/zlogger）
+- **原則**：
+  - 統一日誌格式與輸出
+  - 支援不同日誌等級
+  - 方便追蹤 request ID、trace ID
+  - 使用 zlogger 提供的結構化日誌功能
+
+#### internal/observability/ - 可觀測性
+
+- **職責**：Metrics、Tracing、健康檢查
+- **metrics/**：Prometheus、StatsD 等指標蒐集
+- **tracing/**：OpenTelemetry、Jaeger 等分散式追蹤
+- **health/**：健康檢查端點
+
+#### internal/shared/ - 專案內共用工具
+
+- **職責**：專案內共用但非領域邏輯的工具
+- **xerrors/**：錯誤處理工具（wrap、unwrap、類型判斷）
+- **xjson/**：JSON 處理工具
+- **xvalidator/**：通用驗證邏輯
+- **原則**：
+  - 與業務邏輯無關
+  - 不對外 export（放 internal）
+  - 避免使用 `util`、`common` 等模糊命名
+
+### pkg/ - 可重用公開 API（可選）
+
+- **職責**：對外發布的穩定 SDK 或工具庫
+- **要求**：
+  - 完整 GoDoc 文件
+  - 語義化版本管理
+  - 完整測試覆蓋
+  - 向後相容承諾
+- **原則**：避免將專案內強耦合邏輯放入，此類邏輯應放 `internal/shared/`
+
+### api/ - API 定義（gRPC/OpenAPI）
+
+- **Proto 定義**：採用 `api/<domain>/v1/*.proto` 結構
+- **package 命名**：`<domain>.v1`（如 `user.v1`、`order.v1`）
+- **go_package**：必須為完整 module path，例如 `github.com/org/project/internal/gen/api/user/v1`
+- **產生程式碼**：統一放置於 `internal/gen/api/`，禁止手動修改
+- **OpenAPI**：若使用 RESTful API，可放置 `api/openapi.yaml`
 
 ---
 
 ## 檔案與命名規範
 
-- 目錄命名：全小寫，避免空白；建議使用短語義單字。避免 `util`、`common` 等含糊命名。
-- 套件（package）命名：全小寫、無底線，與目錄語意一致；詳見「Go Style 規範」。
-- Go 檔名：全小寫，可使用底線分隔（Go 慣例），例如 `http_server.go`；測試檔以 `_test.go` 結尾。
-- 其他資產：
-  - YAML/JSON/SQL：檔名採 `kebab-case` 或 `snake_case`，需與用途對應，例如 `app-config.example.yaml`。
-  - 秘密資訊不得進入版本庫；使用 `*.example.*` 或樣本檔示意。
+### 目錄命名
+
+- **格式**：全小寫，避免空白與特殊字元
+- **語意**：使用清晰的短語義單字（如 `handler`、`repo`、`service`）
+- **禁止**：避免 `util`、`common`、`helper`、`misc` 等模糊命名
+- **複數/單數**：與 Go 慣例一致（package 通常單數，內容物可複數）
+
+### 套件（Package）命名
+
+- **格式**：全小寫、無底線、簡短有意義
+- **一致性**：package 名稱應與目錄名稱一致
+- **避免**：
+  - 過於泛用的名稱（`base`、`core`、`lib`）
+  - 與標準庫衝突（`fmt`、`http`、`net`）
+  - 使用底線或駝峰（Go 不慣用）
+
+### Go 檔案命名
+
+- **格式**：全小寫，可使用底線分隔（`http_server.go`、`user_repo.go`）
+- **測試檔**：以 `_test.go` 結尾（`user_repo_test.go`）
+- **表格測試**：可使用 `_testdata.go`（不含 test 後綴，避免編譯為測試）
+- **平台特定**：使用 build tags（`_linux.go`、`_darwin.go`）
+
+### 其他資產檔案
+
+- **YAML/JSON**：使用 `kebab-case` 或 `snake_case`
+  - 範例：`app-config.yaml`、`database_schema.json`
+- **SQL**：遷移檔使用時間戳前綴
+  - 範例：`20240101120000_create_users_table.sql`
+- **Proto**：使用 `snake_case`（`user_service.proto`）
+- **Markdown**：使用 `kebab-case`（`api-design.md`）
+
+### 機密管理
+
+- **原則**：秘密資訊（密碼、金鑰、Token）不得進入版本庫
+- **作法**：
+  - 提供範本檔（`config.example.yaml`、`.env.example`）
+  - 使用 `.gitignore` 忽略實際設定檔
+  - 在 README 說明如何建立實際設定
+- **生產環境**：使用環境變數或密鑰管理服務（Vault、AWS Secrets Manager）
 
 ---
 
-## 測試與資料夾
+## 測試策略
 
-- 單元測試與被測模組同層放置（`foo_test.go`）。
-- 共用測試工具與整合測試置於 `test/`：
-  - `test/integration/`、`test/e2e/` 等明確區分。
-  - 長時間或需要外部資源的測試採 build tags（`//go:build integration`）。
+### 單元測試
+
+- **位置**：與被測檔案同目錄（`user_service.go` → `user_service_test.go`）
+- **命名**：使用 `Test<FunctionName>` 格式
+- **風格**：推薦 table-driven tests
+- **mock**：
+  - 手寫 mock struct 實作介面（小型專案）
+  - 使用 gomock、mockery 等工具（大型專案）
+- **覆蓋率**：核心業務邏輯應達 80% 以上
+
+### 整合測試
+
+- **位置**：`tests/integration/`
+- **範圍**：測試 Adapters 與外部服務整合（DB、Redis、API）
+- **隔離**：使用 Docker、testcontainers 提供乾淨環境
+- **build tags**：使用 `//go:build integration` 標記，避免影響快速單元測試
+
+### E2E 測試
+
+- **位置**：`tests/e2e/`
+- **範圍**：完整業務流程測試
+- **執行**：CI/CD 環境或本地 Docker Compose
+- **工具**：可使用 Playwright、Selenium（若含前端）
+
+### 測試原則
+
+- **獨立性**：測試間不應有依賴，順序不應影響結果
+- **可重複**：使用固定種子、時間 mock，避免隨機失敗
+- **快速**：單元測試應在秒級完成
+- **清晰**：測試名稱應清楚描述測試情境與預期
 
 ---
 
-## 生成產物與工具
+## 生成產物管理
 
-- 原則上不提交生成產物；如因 CI 或使用者便捷需要提交，必須：
-  - 放於固定資料夾（`internal/gen/`）
-  - 在檔頭包含 `// Code generated ... DO NOT EDIT.` 提示
-  - 在 README 或生成設定（如 `buf.gen.yaml`、`Makefile`）說明產生流程
+### 原則
+
+- **不提交產物**：優先不提交自動生成檔案（如 Proto 產生的 Go 程式碼）
+- **例外情況**：若為方便 CI 或使用者，可提交產物
+
+### 提交產物時的要求
+
+1. **固定資料夾**：統一放置於 `internal/gen/`
+2. **標記註解**：檔頭包含 `// Code generated by <tool>. DO NOT EDIT.`
+3. **文件說明**：在 README 或 `Makefile` 說明如何重新產生
+4. **版本鎖定**：產生工具版本需明確記錄（`tools.go` 或文件）
+
+### 常見產生工具
+
+- **Protocol Buffers**：使用 `buf generate` 或 `protoc`
+- **Mock**：使用 `mockgen`、`mockery`
+- **Wire**：使用 `wire gen`
+- **ORM**：使用 `sqlc`、`ent` 等
 
 ---
 
-## 設定與機密
+## 組態與機密管理
 
-- `configs/` 僅放樣本或非敏感設定：
-  - `config.example.yaml`、`.env.example`，並在 README 說明如何複製成實際檔案
-- 機密透過環境變數或密鑰管理（Vault/Secrets Manager），禁止硬編碼與提交。
+### configs/ 目錄
+
+- **內容**：僅放範本或非敏感設定
+- **檔案**：
+  - `config.example.yaml`：應用設定範本
+  - `.env.example`：環境變數範本
+- **說明**：在 README 中說明：
+  1. 如何複製範本為實際檔案
+  2. 各設定項的用途
+  3. 必填與選填項目
+
+### 機密管理
+
+- **開發環境**：使用 `.env` 檔案（需加入 `.gitignore`）
+- **生產環境**：
+  - 環境變數注入
+  - Vault、AWS Secrets Manager、GCP Secret Manager
+  - Kubernetes Secrets
+- **禁止**：
+  - 硬編碼在程式碼中
+  - 提交至版本庫
+  - 在日誌中輸出
+
+### 組態載入
+
+- **優先序**：環境變數 > 設定檔 > 預設值
+- **驗證**：啟動時驗證必填項與格式
+- **型別安全**：使用 struct 定義組態，避免散落字串鍵值
 
 ---
 
-## 資料庫與遷移
+## 資料庫遷移管理
 
-- 所有 Schema 變更透過 `migrations/` 管理；禁止直接變更 DB 結構而不經遷移。
-- 以遷移工具（如 goose/tern/migrate）管理版本與回滾，檔名需包含時間戳與清楚描述。
+### 原則
+
+- **所有變更**：必須透過 `migrations/` 管理，禁止手動修改 Schema
+- **版本控制**：遷移檔納入 Git，確保團隊同步
+- **向後相容**：盡可能使變更向後相容，避免中斷服務
+
+### 遷移工具
+
+- **建議**：golang-migrate、goose、atlas、tern
+- **選擇依據**：
+  - 團隊熟悉度
+  - 是否支援目標資料庫
+  - 回滾能力
+
+### 檔案命名
+
+- **格式**：`<timestamp>_<description>.<up|down>.sql`
+- **範例**：
+  - `20240615120000_create_users_table.up.sql`
+  - `20240615120000_create_users_table.down.sql`
+- **描述**：使用清晰的英文描述（`create_users`、`add_email_index`）
+
+### 最佳實踐
+
+1. **小步遷移**：每次遷移包含單一變更
+2. **測試回滾**：確保 `.down.sql` 可正確回滾
+3. **資料遷移**：若涉及資料轉換，需額外測試與備份
+4. **文件記錄**：重大 Schema 變更應記錄於 ADR
 
 ---
 
 ## CI/CD 與自動化
 
-- CI 設定置於 `.github/workflows/`，共用腳本置於 `scripts/`。
-- 建議 Make 目標：
-  - `make lint`、`make test`、`make build`、`make proto`、`make fmt`
+### CI 設定
+
+- **位置**：`.github/workflows/`（GitHub Actions）或對應 CI 平台設定
+- **腳本**：共用腳本置於 `scripts/`（如 `scripts/lint.sh`、`scripts/test.sh`）
+
+### Makefile 目標
+
+建議定義以下常用目標：
+
+```makefile
+.PHONY: help
+help:          ## 顯示此說明
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: fmt
+fmt:           ## 格式化程式碼
+	@gofmt -s -w .
+	@goimports -w .
+
+.PHONY: lint
+lint:          ## 執行 linter
+	@golangci-lint run ./...
+
+.PHONY: test
+test:          ## 執行單元測試
+	@go test -v -race -coverprofile=coverage.out ./...
+
+.PHONY: test-integration
+test-integration: ## 執行整合測試
+	@go test -v -tags=integration ./tests/integration/...
+
+.PHONY: build
+build:         ## 建置應用程式
+	@go build -o bin/app cmd/api/main.go
+
+.PHONY: run
+run:           ## 執行應用程式
+	@go run cmd/api/main.go
+
+.PHONY: proto
+proto:         ## 產生 Proto 程式碼
+	@buf generate
+
+.PHONY: migrate-up
+migrate-up:    ## 執行資料庫遷移
+	@migrate -path migrations -database "${DATABASE_URL}" up
+
+.PHONY: migrate-down
+migrate-down:  ## 回滾資料庫遷移
+	@migrate -path migrations -database "${DATABASE_URL}" down 1
+```
+
+### CI/CD 流程
+
+1. **Lint**：程式碼風格檢查（golangci-lint）
+2. **Test**：單元測試 + 整合測試
+3. **Build**：建置應用程式
+4. **Security**：安全掃描（gosec、trivy）
+5. **Coverage**：測試覆蓋率報告
+6. **Deploy**：部署至測試/生產環境
 
 ---
 
-## 溝通與維護
+## 文件與維護
 
-- 每個頂層目錄應有最小化 README（如有非顯而易見的結構或流程）。
-- 大型重構需更新本規則或在 PR 描述清楚偏離處與理由。
+### 必要文件
+
+- **README.md**：專案簡介、快速開始、環境設定
+- **docs/SDD.md**：軟體設計文件（Software Design Document）
+- **docs/ADR/**：架構決策記錄（Architecture Decision Records）
+- **docs/API.md** 或 OpenAPI spec：API 文件
+
+### 目錄 README
+
+- **原則**：每個頂層目錄應有簡短 README（若結構不直觀）
+- **內容**：
+  - 目錄用途
+  - 檔案組織邏輯
+  - 使用範例（若為工具或 SDK）
+
+### 維護原則
+
+1. **一致性**：新程式碼需遵循本規範
+2. **重構**：大型重構需更新本規則或在 PR 中說明偏離理由
+3. **文件同步**：程式碼變更時同步更新文件
+4. **團隊共識**：規範變更需團隊討論與同意
+
+---
+
+## 參考資源
+
+- [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md)
+- [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
+- [Standard Go Project Layout](https://github.com/golang-standards/project-layout)
+- [Domain-Driven Design](https://martinfowler.com/bliki/DomainDrivenDesign.html)
+- [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/)

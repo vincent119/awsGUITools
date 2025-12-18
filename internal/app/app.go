@@ -10,15 +10,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/vin/ck123gogo/internal/app/config"
-	"github.com/vin/ck123gogo/internal/app/state"
-	awsclients "github.com/vin/ck123gogo/internal/aws/clients"
-	"github.com/vin/ck123gogo/internal/aws/session"
-	"github.com/vin/ck123gogo/internal/i18n"
-	"github.com/vin/ck123gogo/internal/observability"
-	"github.com/vin/ck123gogo/internal/service/resource"
-	"github.com/vin/ck123gogo/internal/theme"
-	"github.com/vin/ck123gogo/internal/ui"
+	"github.com/vincent119/awsGUITools/internal/app/config"
+	"github.com/vincent119/awsGUITools/internal/app/state"
+	awsclients "github.com/vincent119/awsGUITools/internal/aws/clients"
+	"github.com/vincent119/awsGUITools/internal/aws/session"
+	"github.com/vincent119/awsGUITools/internal/i18n"
+	"github.com/vincent119/awsGUITools/internal/observability"
+	"github.com/vincent119/awsGUITools/internal/service/resource"
+	"github.com/vincent119/awsGUITools/internal/theme"
+	"github.com/vincent119/awsGUITools/internal/ui"
 )
 
 // App 代表整體 CLI 應用生命週期。

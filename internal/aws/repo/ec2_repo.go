@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"github.com/vin/ck123gogo/internal/models"
+	"github.com/vincent119/awsGUITools/internal/models"
 )
 
 // EC2Repository 負責查詢 EC2 實例與關聯資訊。

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vin/ck123gogo/internal/aws/profile"
+	"github.com/vincent119/awsGUITools/internal/aws/profile"
 )
 
 func TestParser_Parse(t *testing.T) {
@@ -119,7 +119,7 @@ output = table
 			name: "whitespace handling",
 			configContent: `
 [  default  ]
-  region   =   ap-southeast-1  
+  region   =   ap-southeast-1
 
 [ profile   spaced  ]
 region=no-spaces
