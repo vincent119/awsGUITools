@@ -28,7 +28,7 @@ go build -o aws-tui ./cmd/aws-tui
 ## 快捷鍵
 
 | 按鍵 | 功能 |
-|------|------|
+| ------ | ------ |
 | `1`-`4` | 切換資源類型（EC2/RDS/S3/Lambda） |
 | `/` | 搜尋 |
 | `Enter` | 進入詳情 |
@@ -129,7 +129,7 @@ make build
 
 ## 專案結構
 
-```
+```bash
 cmd/aws-tui/          # CLI 進入點
 internal/
   app/                # 應用生命週期與設定
